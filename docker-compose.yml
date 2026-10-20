@@ -1,0 +1,67 @@
+# Local development / single-node stack.
+#   cp .env.example .env   (edit secrets)
+#   docker compose up --build
+# API: http://localhost:8000/api/docs   Web: http://localhost:3000
+name: copperbelt
+
+services:
+  db:
+    build: ./deploy/db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?set in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./deploy/db/docker-init.sh:/docker-entrypoint-initdb.d/10-init.sh:ro
+      - ./deploy/db/bootstrap.sql:/bootstrap.sql:ro
+    env_file: .env
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 20
+    ports: ["127.0.0.1:5432:5432"]
+
+  clamav:
+    image: clamav/clamav:1.4
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 30s
+      retries: 10
+
+  migrate:
+    build: ./backend
+    command: ["alembic", "upgrade", "head"]
+    env_file: .env
+    depends_on:
+      db: { condition: service_healthy }
+
+  api:
+    build: ./backend
+    env_file: .env
+    environment:
+      CBI_CLAMAV_HOST: clamav
+    volumes: [objects:/data/objects]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    ports: ["127.0.0.1:8000:8000"]
+
+  worker:
+    build: ./backend
+    command: ["copperbelt", "worker"]
+    env_file: .env
+    environment:
+      CBI_CLAMAV_HOST: clamav
+    volumes: [objects:/data/objects]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  web:
+    build: ./frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports: ["127.0.0.1:3000:3000"]
+    depends_on: [api]
+
+volumes:
+  pgdata:
+  objects:

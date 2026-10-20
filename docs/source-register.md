@@ -1,0 +1,29 @@
+# Data-source register
+
+Status vocabulary: **connected** (adapter live-verified) · **adapter built, unverified** · **blocked** (access or licence not established) · **not started**.
+No source may be ingested until its access basis is recorded on the `sources` table (`access_status` ∈ authorised / open_licence / public_domain). The API enforces this (`source_not_authorised`).
+
+Last reviewed: 2026-10-20. Facts below come from the cited public sources; anything not confirmed is marked *unconfirmed*.
+
+| Source | Holder | What it could provide | Access method (known) | Licence / terms | Status | Next action |
+|---|---|---|---|---|---|---|
+| **Customer-uploaded documents** | Customer | Reports, maps, data rooms | Upload API (`POST /api/v1/documents`) | Customer warrants rights; recorded per source | **connected** | Contract clause: customer warrants authority to upload |
+| **US Geological Survey publications** (e.g. Central African Copperbelt assessments) | USGS | Regional geology, deposit models, occurrence tables | Public download | US federal works, public domain | blocked here (sandbox network) — usable once fetched | Attach PDFs or run ingestion from a networked host |
+| **Royal Museum for Central Africa (RMCA, Tervuren) geological archives** | Belgian federal institution | Colonial-era survey and company records for the DRC (est. up to ~7M pages across RMCA + Belgian State Archives) | Academic access free; **paid corporate access discontinued in 2021** pending an agreement with the DRC government | Collections inalienable; EU open-data rules cited; specific licence for commercial reuse *unconfirmed* | **blocked** | Do not plan on this source until a DRC–RMCA access framework exists; monitor PanAfGeo digitisation (Manono, Dibaya/Luiza, Kongo Central first) |
+| **RMCA Geocatalogue** | RMCA | Metadata records for maps/datasets | Public GeoNetwork catalogue | Per-record | not started | Assess per-record licences; metadata harvest (CSW) is likely feasible |
+| **University of Lubumbashi (UNILU) archive** | UNILU | Theses, local survey reports | Institutional agreement | *unconfirmed* | **blocked** | Approach as an institutional digitisation customer (Capability 5) rather than a data source |
+| **"RDC Rocks"** | *unconfirmed* | — | No public API found in search | *unconfirmed* | **blocked** | Need the exact organisation/URL from the business owner |
+| **Zambia Mining Cadastre** | Ministry of Mines and Minerals Development (system: Trimble Landfolio / Spatial Dimension) | Licence geometries, holders, status | Public map portal `portals.landfolio.com/Zambia/`; transactional portal `portal.miningcadastre.com` | Terms of reuse *unconfirmed*; service was disrupted in 2025 when the vendor contract expired and reopened on an interim basis | **blocked** | Obtain written permission for automated access; never cache without a last-checked timestamp |
+| **DRC Cadastre Minier (CAMI)** | CAMI (FlexiCadastre, since 2007) | Mining title registry | Public registry; current online map URL *unconfirmed* | *unconfirmed* | **blocked** | Note: **new applications suspended since 17 Dec 2025** pending a cadastre clean-up; title data is in flux |
+| **Zambia Geological Survey Department** | GSD Zambia | Geological maps, reports | Purchase / institutional request | *unconfirmed* | not started | Ask GSD for licensing terms for digital reuse |
+| **Planet Labs** | Planet | Satellite scenes, monitoring | REST API (Data, Orders, Subscriptions) | Commercial; display/redistribution per contract | adapter built, unverified | Provide API key + contract terms |
+| **PVGIS** | EC Joint Research Centre | Modelled solar radiation, PV yield, TMY | Public REST API, no key | Free with attribution | adapter built, unverified (sandbox blocks network) | Run `copperbelt check-providers` from a networked host |
+| **Elevation (e.g. Copernicus DEM GLO-30)** | ESA / Copernicus | Terrain, slope | Public download | Copernicus licence (*verify for GLO-30 commercial use*) | not started | Stage 4 |
+| **OpenStreetMap** | OSM contributors | Roads, rail, settlements | Planet extracts / Overpass | ODbL (share-alike on derived databases) | not started | Check ODbL implications before mixing into customer datasets |
+
+## Implications for the product
+
+1. The richest historical DRC archive (RMCA) is **not commercially accessible today**, and a well-funded actor (KoBold Metals) has publicly sought it. A strategy that depends on exclusive archive access is weak; one that serves customers' **own** data rooms and licensed archives is not exposed to that risk.
+2. Title data in both countries is unstable (Zambia's 2025 system disruption; the DRC's 2025–26 suspension and title recoveries). This supports the "source + last-checked timestamp + link to official verification" design and argues against ever presenting cached title status as current.
+
+Sources: [Mining Weekly, 12 Jun 2025](https://www.miningweekly.com/article/zambias-south-africa-based-cadastre-system-developer-re-engaged-ministry-confirms-2025-06-12) · [Bankable, DRC suspends new applications](https://bankable.africa/en/mining/1712-2157-dr-congo-suspends-new-mining-applications-as-it-overhauls-cadastre) · [Egmont Institute on the Tervuren archives](https://egmontinstitute.be/the-tervuren-museum-mining-archives-mystery-unveiled/) · [Trimble: DRC selects FlexiCadastre](https://landadmin.trimble.com/articles/drc-selects-flexicadastre-as-new-mining-cadastre-system/) · [RMCA Geocatalogue](https://geocatalogue.africamuseum.be/geonetwork/srv/api/records/BE-RMCA-EARTHS-000997)

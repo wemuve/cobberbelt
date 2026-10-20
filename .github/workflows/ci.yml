@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgis/postgis:16-3.5
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-retries 20
+    env:
+      PGPASSWORD: postgres
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - name: System packages (Tesseract eng+fra, pgvector, psql)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-fra postgresql-client fonts-dejavu-core
+      - name: Install pgvector into the service container
+        run: |
+          CID=$(docker ps -q --filter ancestor=postgis/postgis:16-3.5)
+          docker exec "$CID" bash -c "apt-get update && apt-get install -y postgresql-16-pgvector"
+      - name: Bootstrap roles and test database
+        run: |
+          psql -h localhost -U postgres -v owner_password=devpassword -v app_password=devpassword -f ../deploy/db/bootstrap.sql
+          psql -h localhost -U postgres -c "ALTER ROLE copperbelt SUPERUSER"   # test harness drops/recreates the schema
+          psql -h localhost -U postgres -c "CREATE DATABASE copperbelt_test OWNER copperbelt"
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+      - run: uv sync --frozen
+      - name: Lint
+        run: uv run ruff check src tests && uv run ruff format --check src tests
+      - name: Tests
+        run: uv run pytest -o addopts="" -q -p no:warnings
+      - name: Dependency vulnerability audit
+        run: uv run pip-audit --skip-editable
+      - name: OpenAPI spec is current
+        run: |
+          uv run python -c "import json; from copperbelt.main import app; print(json.dumps(app.openapi(), indent=2, sort_keys=True))" > /tmp/openapi.json
+          diff -u ../docs/api/openapi.json /tmp/openapi.json
+
+  frontend:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm audit --audit-level=high --omit=dev
+
+  images:
+    runs-on: ubuntu-24.04
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t copperbelt-api ./backend
+      - run: docker build -t copperbelt-db ./deploy/db
+      - run: docker build -t copperbelt-web ./frontend
