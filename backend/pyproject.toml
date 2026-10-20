@@ -1,0 +1,60 @@
+[project]
+name = "copperbelt"
+version = "0.1.0"
+description = "Copperbelt Intelligence: evidence-traceable geological and mining project intelligence API"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "alembic>=1.20.0",
+    "argon2-cffi>=25.1.0",
+    "email-validator>=2.3.0",
+    "fastapi>=0.156.2",
+    "geoalchemy2>=0.20.0",
+    "httpx>=0.28.1",
+    "pgvector>=0.5.1",
+    "pillow>=13.0.0",
+    "psycopg[binary]>=3.3.6",
+    "pydantic-settings>=2.16.1",
+    "pyjwt>=2.15.1",
+    "pypdf>=6.21.1",
+    "pypdfium2>=5.14.0",
+    "pyproj>=3.8.0",
+    "pytesseract>=0.3.13",
+    "python-multipart>=0.0.32",
+    "shapely>=2.2.0",
+    "sqlalchemy>=2.0",
+    "structlog>=26.1.0",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[project.scripts]
+copperbelt = "copperbelt.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.11.32,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "mypy>=2.4.0",
+    "pip-audit>=2.10.1",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.17.1",
+]
+
+[project.optional-dependencies]
+s3 = ["boto3>=1.35"]
+
+[tool.ruff]
+line-length = 130
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S", "BLE"]
+ignore = ["S101", "B008", "S105", "S106", "S608"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = ["live: requires real external credentials (skipped by default)"]

@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+# Runtime data — never commit
+var/
+*.env
+.env
+!.env.example
+backups/
+# Node
+node_modules/
+.next/
+frontend/out/
+# OS
+.DS_Store
