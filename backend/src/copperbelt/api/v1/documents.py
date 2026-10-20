@@ -268,6 +268,22 @@ def process(document_id: uuid.UUID, body: ProcessIn | None = None, c: Ctx = Depe
     return job
 
 
+@router.post("/documents/{document_id}/reextract", response_model=JobOut, status_code=202)
+def reextract(document_id: uuid.UUID, c: Ctx = Depends(require("documents:process"))) -> Job:
+    """Re-run claim extraction with the current rules on stored page text, without OCR."""
+    from copperbelt.jobs.queue import enqueue
+
+    doc = get_visible_document(c, document_id)
+    if doc.status != DocumentStatus.processed:
+        raise ValidationFailed("The document must finish processing first")
+    job = enqueue(
+        c.db, svc.REEXTRACT_JOB, {"document_id": str(doc.id)}, org_id=c.org_id, created_by=c.user.id, dedupe_key=f"reextract:{doc.id}"
+    )
+    c.db.flush()
+    record_ctx(c, "document.reextract_requested", "document", doc.id, job_id=str(job.id))
+    return job
+
+
 @router.get("/documents/{document_id}/status")
 def status(document_id: uuid.UUID, c: Ctx = Depends(require("documents:read"))) -> dict:
     doc = get_visible_document(c, document_id)

@@ -3,6 +3,7 @@ ingest → process (text layer + OCR) → claims → review → feature → sear
 
 from __future__ import annotations
 
+import pytest
 from conftest import add_member, make_source, upload
 from fixtures import ENGLISH_PAGE, FRENCH_PAGE, SYNTHETIC_MARKER, make_png, make_scanned_pdf, make_text_pdf
 
@@ -210,3 +211,33 @@ def test_feature_uncertainty_is_never_invented_and_edits_are_audited(owner):
     assert p.json()["uncertainty_m"] is None
     events = owner.get("/api/v1/audit-events", params={"action": "feature.updated"}).json()["items"]
     assert len(events) == 2 and events[-1]["detail"]["after"] == {"uncertainty_m": "500.0", "commodities": "['copper']"}
+
+
+def test_table_coordinate_needs_reviewer_hemisphere_before_mapping(owner):
+    src = make_source(owner)
+    body = "SYNTHETIC TEST FIXTURE station table\nTABLEAU DES COORDONNEES DES STATIONS\n1. Kalunda . . . . 2 30 43 25 46 45 1 43 07 565\n"
+    r = owner.post(
+        "/api/v1/documents", files={"file": ("table.txt", body.encode(), "text/plain")}, data={"source_id": src, "title": "Synthetic table"}
+    )
+    doc_id = r.json()["document"]["id"]
+    drain()
+    claim = owner.get("/api/v1/claims", params={"document_id": doc_id, "claim_type": "coordinate"}).json()["items"][0]
+    assert claim["attributes"]["format"] == "table_dms" and claim["attributes"]["lat"] is None
+    owner.post(f"/api/v1/claims/{claim['id']}/review", json={"decision": "accepted"})
+    r = owner.post(f"/api/v1/claims/{claim['id']}/promote", json={"name": "Kalunda"})
+    assert r.status_code == 422 and r.json()["error"]["code"] == "hemisphere_required"
+    r = owner.post(
+        f"/api/v1/claims/{claim['id']}/promote",
+        json={
+            "name": "Kalunda",
+            "feature_type": "survey_location",
+            "lat_hemisphere": "N",
+            "lon_hemisphere": "E",
+            "hemisphere_basis": "Table marks southern stations with '—'; unsigned rows are north. Region is east of Greenwich.",
+        },
+    )
+    assert r.status_code == 201, r.text
+    f = r.json()
+    assert f["geometry"]["coordinates"] == [pytest.approx(25.779167, abs=1e-6), pytest.approx(2.511944, abs=1e-6)]
+    assert "assigned by reviewer" in f["description"]
+    assert f["uncertainty_m"] == 31.0  # one arc-second resolution, as printed

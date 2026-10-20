@@ -89,3 +89,40 @@ def test_reprocess_is_deduplicated_and_preserves_reviewed_claims(owner):
     assert any(c["id"] == keep["id"] and c["review_status"] == "accepted" for c in after)
     pages = owner.get(f"/api/v1/documents/{doc['id']}/pages").json()
     assert len(pages) == 2 and all(p["extraction_method"] == "ocr" for p in pages)
+
+
+def test_rules_only_reextraction_keeps_pages_and_reviewed_claims(owner):
+    doc = upload(owner, make_source(owner), make_text_pdf([FRENCH_PAGE, ENGLISH_PAGE]))["document"]
+    drain()
+    pages_before = owner.get(f"/api/v1/documents/{doc['id']}/pages").json()
+    claims = owner.get("/api/v1/claims", params={"document_id": doc["id"]}).json()["items"]
+    owner.post(f"/api/v1/claims/{claims[0]['id']}/review", json={"decision": "accepted"})
+    r = owner.post(f"/api/v1/documents/{doc['id']}/reextract")
+    assert r.status_code == 202
+    drain()
+    assert owner.get(f"/api/v1/jobs/{r.json()['id']}").json()["status"] == "succeeded"
+    assert owner.get(f"/api/v1/documents/{doc['id']}/pages").json() == pages_before
+    after = owner.get("/api/v1/claims", params={"document_id": doc["id"]}).json()
+    assert after["total"] == len(claims)
+    assert any(c["id"] == claims[0]["id"] and c["review_status"] == "accepted" for c in after["items"])
+
+
+def test_heartbeat_keeps_long_jobs_from_being_reclaimed_and_fencing_discards_stale_results(owner):
+    upload(owner, make_source(owner), make_text_pdf([FRENCH_PAGE]))
+    job = queue.claim_next("worker-a")
+    _owner_sql("UPDATE jobs SET locked_at = :t", t=datetime.now(UTC) - timedelta(hours=2))
+    # A heartbeat from the owner refreshes the lock, so nobody can steal the job.
+    assert queue.beat(job.id, "worker-a") is True
+    assert queue.claim_next("worker-b") is None
+    # Another worker cannot heartbeat a job it does not own.
+    assert queue.beat(job.id, "worker-b") is False
+    # Simulate worker A dying: lock goes stale, B reclaims and finishes.
+    _owner_sql("UPDATE jobs SET locked_at = :t", t=datetime.now(UTC) - timedelta(hours=2))
+    done = run_one("worker-b")
+    assert done.id == job.id and str(done.status) == "succeeded"
+    # A late progress report from A is refused rather than silently corrupting state.
+    import pytest
+
+    ctx = queue.JobContext(job, "worker-a")
+    with pytest.raises(queue.LostLock):
+        ctx.progress(0.5, "late")

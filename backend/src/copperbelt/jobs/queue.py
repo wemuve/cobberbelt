@@ -9,6 +9,7 @@ workers. See docs/adr/0003-job-queue.md.
 from __future__ import annotations
 
 import socket
+import threading
 import traceback
 import uuid
 from collections.abc import Callable
@@ -85,26 +86,75 @@ def enqueue(
     return job
 
 
+HEARTBEAT_SECONDS = 30
+
+
+class LostLock(Exception):
+    """This worker no longer owns the job (another worker reclaimed it)."""
+
+
+class _Heartbeat:
+    """Refreshes ``locked_at`` while a handler runs, so long jobs are never mistaken for abandoned ones."""
+
+    def __init__(self, job_id: uuid.UUID, worker_id: str, interval: float = HEARTBEAT_SECONDS) -> None:
+        self.job_id, self.worker_id, self.interval = job_id, worker_id, interval
+        self._stop = threading.Event()
+        self.lost = False
+        self._thread = threading.Thread(target=self._run, name=f"heartbeat-{job_id}", daemon=True)
+
+    def _run(self) -> None:
+        while not self._stop.wait(self.interval):
+            try:
+                if not beat(self.job_id, self.worker_id):
+                    self.lost = True
+                    return
+            except Exception:  # noqa: BLE001 - a missed beat is retried on the next tick
+                log.warning("job.heartbeat_failed", job_id=str(self.job_id))
+
+    def __enter__(self) -> _Heartbeat:
+        self._thread.start()
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self._stop.set()
+        self._thread.join(timeout=5)
+
+
+def beat(job_id: uuid.UUID, worker_id: str) -> bool:
+    """Refresh the lock if (and only if) this worker still holds it."""
+    with system_session() as s:
+        res = s.execute(
+            update(Job)
+            .where(Job.id == job_id, Job.locked_by == worker_id, Job.status == JobStatus.running)
+            .values(locked_at=datetime.now(UTC))
+        )
+        return res.rowcount == 1
+
+
 class JobContext:
-    def __init__(self, job: Job) -> None:
+    def __init__(self, job: Job, worker_id: str | None = None) -> None:
         self.job_id = job.id
         self.kind = job.kind
         self.payload = dict(job.payload)
         self.org_id = job.org_id
         self.attempt = job.attempts
         self.max_attempts = job.max_attempts
+        self.worker_id = worker_id or job.locked_by
 
     def session(self) -> Session:
         """A session bound to the job's tenant (RLS applies)."""
         return new_session(self.org_id) if self.org_id else new_session(system=True)
 
     def progress(self, fraction: float, message: str | None = None) -> None:
+        """Report progress; doubles as a heartbeat. Raises LostLock if another worker has taken the job."""
         with system_session() as s:
-            s.execute(
+            res = s.execute(
                 update(Job)
-                .where(Job.id == self.job_id)
-                .values(progress=round(max(0.0, min(1.0, fraction)) * 100, 2), progress_message=message)
+                .where(Job.id == self.job_id, Job.locked_by == self.worker_id)
+                .values(progress=round(max(0.0, min(1.0, fraction)) * 100, 2), progress_message=message, locked_at=datetime.now(UTC))
             )
+            if res.rowcount != 1:
+                raise LostLock(f"Job {self.job_id} was reclaimed by another worker")
 
 
 def _backoff(attempt: int) -> timedelta:
@@ -154,8 +204,12 @@ def run_one(worker_id: str | None = None) -> Job | None:
     try:
         if fn is None:
             raise PermanentJobError(f"No handler registered for job kind '{job.kind}'")
-        result = fn(JobContext(job)) or {}
+        with _Heartbeat(job.id, worker_id):
+            result = fn(JobContext(job, worker_id)) or {}
         status = JobStatus.succeeded
+    except LostLock:
+        log.warning("job.lost_lock", job_id=str(job.id), worker_id=worker_id)
+        return job  # the worker that now owns the job will record its outcome
     except PermanentJobError as exc:
         status, error = JobStatus.dead, f"{type(exc).__name__}: {exc}"
     except Exception as exc:  # noqa: BLE001
@@ -173,7 +227,11 @@ def run_one(worker_id: str | None = None) -> Job | None:
             values.update(finished_at=datetime.now(UTC))
         if run_after:
             values["run_after"] = run_after
-        s.execute(update(Job).where(Job.id == job.id).values(**values))
+        res = s.execute(update(Job).where(Job.id == job.id, Job.locked_by == worker_id).values(**values))
+        if res.rowcount != 1:
+            # Fencing: another worker reclaimed this job; its outcome, not ours, is authoritative.
+            log.warning("job.result_discarded_lost_lock", job_id=str(job.id), worker_id=worker_id)
+            return job
         if fn is not None and status == JobStatus.dead and hasattr(fn, "on_dead"):
             fn.on_dead(JobContext(job), error)  # type: ignore[attr-defined]
     job.status, job.result, job.last_error = status, result, error

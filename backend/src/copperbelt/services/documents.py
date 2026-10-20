@@ -25,7 +25,7 @@ from copperbelt.ingestion.validation import (
     sniff_content_type,
 )
 from copperbelt.ingestion.vocabulary import normalise
-from copperbelt.jobs.queue import JobContext, PermanentJobError, enqueue, handler
+from copperbelt.jobs.queue import JobContext, LostLock, PermanentJobError, enqueue, handler
 from copperbelt.models.evidence import (
     INGESTIBLE_ACCESS,
     Claim,
@@ -249,34 +249,7 @@ def process_document(job: JobContext) -> dict:
                     )
                 )
 
-        # Unreviewed machine candidates from earlier runs are replaced; reviewed claims are preserved.
-        db.execute(
-            delete(Claim).where(
-                Claim.document_id == doc.id,
-                Claim.extraction_method == ExtractionMethod.rule,
-                Claim.review_status == ReviewStatus.unreviewed,
-            )
-        )
-        n_claims = 0
-        for p in pages:
-            for c in extract_candidates(p.text):
-                db.add(
-                    Claim(
-                        org_id=doc.org_id,
-                        document_id=doc.id,
-                        page_number=p.page_number,
-                        char_start=c.char_start,
-                        char_end=c.char_end,
-                        claim_type=ClaimType(c.claim_type),
-                        statement=c.statement,
-                        commodities=c.commodities,
-                        attributes=c.attributes,
-                        extraction_method=ExtractionMethod.rule,
-                        extractor_version=RULES_VERSION,
-                        confidence=c.confidence,
-                    )
-                )
-                n_claims += 1
+        n_claims = replace_rule_claims(db, doc, pages)
 
         langs = sorted({p.detected_language for p in pages if p.detected_language})
         ocr_pages = [p for p in pages if p.extraction_method == ExtractionMethod.ocr]
@@ -300,6 +273,9 @@ def process_document(job: JobContext) -> dict:
         record(db, "document.processed", org_id=doc.org_id, actor_id=None, entity_type="document", entity_id=doc.id, detail=summary)
         db.commit()
         return summary
+    except LostLock:
+        db.rollback()  # another worker owns this job now; leave the document to it
+        raise
     except Exception as exc:
         db.rollback()
         _mark_failed(db, doc_id, exc, terminal=isinstance(exc, PermanentJobError) or job.attempt >= job.max_attempts)
@@ -307,6 +283,75 @@ def process_document(job: JobContext) -> dict:
     finally:
         db.close()
         shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def replace_rule_claims(db: Session, doc: Document, pages: list[DocumentPage]) -> int:
+    """Re-run deterministic extraction over page text. Unreviewed machine candidates are replaced;
+    anything a person has reviewed is preserved untouched."""
+    db.execute(
+        delete(Claim).where(
+            Claim.document_id == doc.id,
+            Claim.extraction_method == ExtractionMethod.rule,
+            Claim.review_status == ReviewStatus.unreviewed,
+        )
+    )
+    kept = {
+        (r.page_number, r.char_start, r.char_end, str(r.claim_type))
+        for r in db.execute(
+            select(Claim.page_number, Claim.char_start, Claim.char_end, Claim.claim_type).where(Claim.document_id == doc.id)
+        )
+    }
+    n = 0
+    for p in pages:
+        for c in extract_candidates(p.text):
+            if (p.page_number, c.char_start, c.char_end, c.claim_type) in kept:
+                continue  # a person already reviewed this exact passage; do not duplicate it
+            db.add(
+                Claim(
+                    org_id=doc.org_id,
+                    document_id=doc.id,
+                    page_number=p.page_number,
+                    char_start=c.char_start,
+                    char_end=c.char_end,
+                    claim_type=ClaimType(c.claim_type),
+                    statement=c.statement,
+                    commodities=c.commodities,
+                    attributes=c.attributes,
+                    extraction_method=ExtractionMethod.rule,
+                    extractor_version=RULES_VERSION,
+                    confidence=c.confidence,
+                )
+            )
+            n += 1
+    return n
+
+
+REEXTRACT_JOB = "document.reextract"
+
+
+@handler(REEXTRACT_JOB)
+def reextract_claims(job: JobContext) -> dict:
+    """Rules-only re-extraction over the stored current page text (no OCR)."""
+    db = job.session()
+    try:
+        doc = db.get(Document, uuid.UUID(job.payload["document_id"]))
+        if doc is None or doc.status != DocumentStatus.processed:
+            raise PermanentJobError("Document must be processed before claims can be re-extracted")
+        pages = list(db.scalars(select(DocumentPage).where(DocumentPage.document_id == doc.id, DocumentPage.is_current.is_(True))))
+        n = replace_rule_claims(db, doc, pages)
+        record(
+            db,
+            "document.claims_reextracted",
+            org_id=doc.org_id,
+            actor_id=None,
+            entity_type="document",
+            entity_id=doc.id,
+            detail={"claim_candidates": n, "rules_version": RULES_VERSION},
+        )
+        db.commit()
+        return {"claim_candidates": n, "rules_version": RULES_VERSION}
+    finally:
+        db.close()
 
 
 def _mark_failed(db: Session, doc_id: uuid.UUID, exc: Exception, *, terminal: bool) -> None:

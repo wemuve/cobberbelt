@@ -303,6 +303,9 @@ class PromoteClaimIn(BaseModel):
     commodities: list[str] = []
     datum_note: str | None = None
     uncertainty_m: float | None = Field(default=None, ge=0)
+    lat_hemisphere: Literal["N", "S"] | None = Field(default=None, description="Required when the source does not state it")
+    lon_hemisphere: Literal["E", "W"] | None = None
+    hemisphere_basis: str | None = Field(default=None, max_length=1000, description="Why the reviewer chose these hemispheres")
 
 
 # ------------------------------------------------------------------ search & geo

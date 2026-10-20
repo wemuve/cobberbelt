@@ -107,3 +107,27 @@ def test_assessment_seal_detects_tampering():
 )
 def test_risk_bands(score, band):
     assert risk_band(score) == band
+
+
+# Synthetic rows in the layout of a 1930s station table (numbers invented).
+TABLE = """TABLEAU DES COORDONNEES DES STATIONS
+1. Kalunda . . . . 2 30 43 25 46 45 1 43 07 565
+2. Mbeya . . . . | + 0 52 46 26 33 15 1 46 13
+3. Lukoto — 0 10 08 | 27 42 15 1 50 49 |
+4. Gambato 32222 | 23 59 45 1 35 59
+5. Ile Simba . . 11332 | 23 37 15 1 34 29 | 355
+"""
+
+
+def test_station_table_rows_are_parsed_without_inventing_hemispheres():
+    from copperbelt.ingestion.rules import parse_table_rows
+
+    rows = parse_table_rows(TABLE)
+    by = {r.attributes["station"]: r for r in rows}
+    assert set(by) == {"Kalunda", "Mbeya", "Lukoto"}  # merged-digit rows are not guessed
+    k = by["Kalunda"].attributes
+    assert k["lat"] is None and k["lon"] is None and k["hemisphere_stated"] is False
+    assert k["lat_abs"] == pytest.approx(2 + 30 / 60 + 43 / 3600, abs=1e-6) and k["lon_abs"] == pytest.approx(25.779167, abs=1e-6)
+    assert by["Mbeya"].attributes["lat_sign_printed"] == "+" and by["Lukoto"].attributes["lat_sign_printed"] == "-"
+    for r in rows:
+        assert TABLE[r.char_start : r.char_end] == r.statement

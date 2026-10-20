@@ -16,12 +16,23 @@ from typing import Any
 
 from copperbelt.ingestion.vocabulary import FORMATION_TERMS, find_commodities, normalise
 
-RULES_VERSION = "rules-1.0.0"
+RULES_VERSION = "rules-1.1.0"
 
 CONF_COORDINATE = 0.8  # explicit DMS/decimal coordinate with hemisphere letters
 CONF_OCCURRENCE = 0.5  # commodity term + occurrence/mineralisation keyword in one sentence
 CONF_DRILLING = 0.6
 CONF_FORMATION = 0.4
+CONF_TABLE_COORDINATE = 0.6  # station-table row: numbers parsed, hemisphere convention not stated
+
+# A numbered station-table row: "12. Name ....  [+|-] D MM SS  [|]  DDD MM SS ...".
+# Station names may not contain digits, so OCR-merged numbers ("11332") are never mis-assigned;
+# such rows are left unparsed for manual entry rather than guessed.
+_L = r"[A-Za-zÀ-ÿ'’\-]"
+TABLE_ROW = re.compile(
+    rf"^[ \t]*\d{{1,3}}\s*[.,][ \t]+(?P<name>[A-ZÀ-Ý]{_L}+(?: {_L}+){{0,3}}?)[ \t.:|]*?(?P<sign>[+\-—–])?[ \t]?"
+    r"(?P<ld>\d{1,2}) (?P<lm>[0-5]\d) (?P<ls>[0-5]\d)[ \t|)]*[ \t](?P<od>\d{1,3}) (?P<om>[0-5]\d) (?P<os>[0-5]\d)\b",
+    re.M,
+)
 
 OCCURRENCE_WORDS = re.compile(
     r"\b(occurrence|occurs|deposit|gisement|indice|indices|mineralis|mineraliz|ore|minerai|showing|"
@@ -130,8 +141,46 @@ def sentences(text: str) -> list[tuple[int, int]]:
     return spans
 
 
+def parse_table_rows(text: str) -> list[Candidate]:
+    """Station-table coordinates. Values are stored as printed; latitude/longitude stay unset because the
+    table does not state its hemisphere convention. A reviewer must supply it before promotion."""
+    out = []
+    for m in TABLE_ROW.finditer(text):
+        lat_abs = int(m["ld"]) + int(m["lm"]) / 60 + int(m["ls"]) / 3600
+        lon_abs = int(m["od"]) + int(m["om"]) / 60 + int(m["os"]) / 3600
+        if lat_abs > 90 or lon_abs > 180:
+            continue
+        sign = {"+": "+", "-": "-", "—": "-", "–": "-"}.get(m["sign"] or "")
+        line_end = text.find("\n", m.end())
+        stmt_end = len(text) if line_end == -1 else line_end
+        start = m.start() + (len(m.group(0)) - len(m.group(0).lstrip()))
+        out.append(
+            Candidate(
+                "coordinate",
+                text[start:stmt_end].rstrip(),
+                start,
+                start + len(text[start:stmt_end].rstrip()),
+                CONF_TABLE_COORDINATE,
+                attributes={
+                    "format": "table_dms",
+                    "station": m["name"].strip(" ."),
+                    "lat": None,
+                    "lon": None,
+                    "lat_abs": round(lat_abs, 6),
+                    "lon_abs": round(lon_abs, 6),
+                    "lat_sign_printed": sign,
+                    "hemisphere_stated": False,
+                    "stated_precision": "seconds",
+                    "datum": "unknown",
+                    "verbatim": m.group(0).strip(),
+                },
+            )
+        )
+    return out
+
+
 def extract_candidates(text: str) -> list[Candidate]:
-    cands: list[Candidate] = []
+    cands: list[Candidate] = parse_table_rows(text)
     for c in parse_coordinates(text):
         # Extend the excerpt to the surrounding sentence for context.
         s = max(text.rfind(".", 0, c["start"]) + 1, text.rfind("\n", 0, c["start"]) + 1, 0)

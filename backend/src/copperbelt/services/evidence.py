@@ -289,6 +289,17 @@ def promote_coordinate_claim(c, claim: Claim, body) -> tuple[GeoFeature, list[st
     if claim.review_status != ReviewStatus.accepted:
         raise Conflict("Review and accept the coordinate claim before promoting it")
     lat, lon = claim.attributes.get("lat"), claim.attributes.get("lon")
+    hemisphere_note = None
+    if (lat is None or lon is None) and claim.attributes.get("hemisphere_stated") is False:
+        if not (body.lat_hemisphere and body.lon_hemisphere and body.hemisphere_basis):
+            raise ValidationFailed(
+                "The source does not state the hemisphere. Provide lat_hemisphere, lon_hemisphere and "
+                "hemisphere_basis (why) to place this location.",
+                code="hemisphere_required",
+            )
+        lat = claim.attributes["lat_abs"] * (-1 if body.lat_hemisphere == "S" else 1)
+        lon = claim.attributes["lon_abs"] * (-1 if body.lon_hemisphere == "W" else 1)
+        hemisphere_note = f"Hemisphere {body.lat_hemisphere}/{body.lon_hemisphere} assigned by reviewer: {body.hemisphere_basis}"
     if lat is None or lon is None:
         raise ValidationFailed("Claim has no parsed coordinates")
     geom, _, warnings = to_storage_geometry({"type": "Point", "coordinates": [lon, lat]}, None)
@@ -308,7 +319,7 @@ def promote_coordinate_claim(c, claim: Claim, body) -> tuple[GeoFeature, list[st
         original_coordinates=claim.attributes.get("verbatim"),
         location_precision=LocationPrecision.reported_coordinates,
         uncertainty_m=uncertainty,
-        description=body.datum_note,
+        description="\n".join(x for x in (body.datum_note, hemisphere_note) if x) or None,
         created_by=c.user.id,
     )
     c.db.add(f)
@@ -323,7 +334,7 @@ def promote_coordinate_claim(c, claim: Claim, body) -> tuple[GeoFeature, list[st
             created_by=c.user.id,
         )
     )
-    record_ctx(c, "feature.promoted_from_claim", "feature", f.id, claim_id=str(claim.id))
+    record_ctx(c, "feature.promoted_from_claim", "feature", f.id, claim_id=str(claim.id), hemisphere_note=hemisphere_note)
     return f, warnings
 
 
