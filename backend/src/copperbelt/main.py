@@ -16,7 +16,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from copperbelt import __version__
 from copperbelt.api.ratelimit import limiter
-from copperbelt.api.v1 import auth, documents, evidence, org, projects, providers
+from copperbelt.api.v1 import auth, catalog, documents, evidence, org, projects, providers
 from copperbelt.config import get_settings
 from copperbelt.db import system_session
 from copperbelt.errors import AppError
@@ -146,7 +146,7 @@ def create_app() -> FastAPI:
         ok = ok and store_ok
         return JSONResponse({"status": "ready" if ok else "not_ready", "checks": checks}, status_code=200 if ok else 503)
 
-    for r in (auth.router, org.router, documents.router, evidence.router, projects.router, providers.router):
+    for r in (auth.router, org.router, documents.router, catalog.router, evidence.router, projects.router, providers.router):
         app.include_router(r, prefix="/api/v1")
     return app
 

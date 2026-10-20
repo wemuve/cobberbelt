@@ -1,4 +1,5 @@
 from copperbelt.models.evidence import (  # noqa: F401
+    CatalogRecord,
     Claim,
     Document,
     DocumentAccessGrant,
@@ -31,6 +32,7 @@ from copperbelt.models.projects import (  # noqa: F401
 
 TENANT_TABLES = [
     "sources",
+    "catalog_records",
     "documents",
     "document_access_grants",
     "document_pages",

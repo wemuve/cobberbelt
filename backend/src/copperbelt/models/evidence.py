@@ -142,7 +142,34 @@ class Source(IdMixin, TimestampMixin, TenantMixin, Base):
     permits_commercial_use: Mapped[bool | None] = mapped_column()
     permits_redistribution: Mapped[bool | None] = mapped_column()
     notes: Mapped[str | None] = mapped_column(Text)
+    # Catalogue connector settings (see connectors/catalog.py); null for upload-only sources.
+    connector_config: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     created_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("users.id"))
+
+
+class CatalogRecord(IdMixin, TimestampMixin, TenantMixin, Base):
+    """A document listed in a source's catalogue. Metadata only: listing is not ingestion."""
+
+    __tablename__ = "catalog_records"
+    __table_args__ = (UniqueConstraint("source_id", "external_id", name="uq_catalog_source_external"),)
+
+    source_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("sources.id", ondelete="CASCADE"), nullable=False, index=True)
+    external_id: Mapped[str] = mapped_column(String(200), nullable=False)
+    title: Mapped[str | None] = mapped_column(Text)
+    authors: Mapped[list[str]] = mapped_column(ARRAY(String(300)), default=list, nullable=False)
+    year: Mapped[int | None] = mapped_column(Integer)
+    language: Mapped[str | None] = mapped_column(String(20))
+    document_type: Mapped[str | None] = mapped_column(String(100))
+    page_count: Mapped[int | None] = mapped_column(Integer)
+    landing_url: Mapped[str | None] = mapped_column(String(1000))
+    file_url: Mapped[str | None] = mapped_column(String(1000))
+    rights_statement: Mapped[str | None] = mapped_column(Text)  # whatever the source itself says, verbatim
+    raw: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)  # the record exactly as received
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)  # of `raw`, to detect upstream changes
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    changed_upstream_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    document_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("documents.id"))  # set once imported
 
 
 # ---------------------------------------------------------------- documents

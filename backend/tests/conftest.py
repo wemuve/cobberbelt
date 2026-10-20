@@ -35,7 +35,8 @@ from alembic.config import Config  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import create_engine, text  # noqa: E402
 
-import copperbelt.services.documents  # noqa: E402, F401  (job handlers)
+import copperbelt.connectors.catalog  # noqa: E402, F401  (job handlers)
+import copperbelt.services.documents  # noqa: E402, F401
 from copperbelt.config import get_settings  # noqa: E402
 from copperbelt.storage import reset_store  # noqa: E402
 
@@ -58,7 +59,7 @@ def migrated_db(tmp_path_factory) -> Iterator[None]:
 
 
 TRUNCATE = (
-    "TRUNCATE assessments, evidence_gaps, risks, project_features, project_documents, areas_of_interest, "
+    "TRUNCATE catalog_records, assessments, evidence_gaps, risks, project_features, project_documents, areas_of_interest, "
     "project_members, projects, review_decisions, feature_evidence, geo_features, claims, page_chunks, "
     "document_pages, document_access_grants, documents, sources, idempotency_records, jobs, provider_usage, "
     "provider_checks, audit_events, memberships, users, organisations CASCADE"

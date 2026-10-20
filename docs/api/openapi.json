@@ -648,6 +648,100 @@
         "title": "ClaimOut",
         "type": "object"
       },
+      "ConnectorConfig": {
+        "properties": {
+          "base_url": {
+            "format": "uri",
+            "maxLength": 2083,
+            "minLength": 1,
+            "title": "Base Url",
+            "type": "string"
+          },
+          "count_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": "count",
+            "title": "Count Key"
+          },
+          "fields": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "platform field \u2192 dotted path in a source record",
+            "title": "Fields",
+            "type": "object"
+          },
+          "id_field": {
+            "default": "id",
+            "title": "Id Field",
+            "type": "string"
+          },
+          "max_pages": {
+            "default": 200,
+            "maximum": 10000.0,
+            "minimum": 1.0,
+            "title": "Max Pages",
+            "type": "integer"
+          },
+          "min_interval_seconds": {
+            "default": 1.0,
+            "maximum": 60.0,
+            "minimum": 0.2,
+            "title": "Min Interval Seconds",
+            "type": "number"
+          },
+          "next_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": "next",
+            "title": "Next Key"
+          },
+          "page_param": {
+            "default": "page",
+            "title": "Page Param",
+            "type": "string"
+          },
+          "page_size": {
+            "default": 24,
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "page_size_param": {
+            "default": "page_size",
+            "title": "Page Size Param",
+            "type": "string"
+          },
+          "results_key": {
+            "default": "results",
+            "title": "Results Key",
+            "type": "string"
+          },
+          "verified_against_live_api": {
+            "default": false,
+            "title": "Verified Against Live Api",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "base_url"
+        ],
+        "title": "ConnectorConfig",
+        "type": "object"
+      },
       "DocumentOut": {
         "properties": {
           "authors": {
@@ -1299,6 +1393,106 @@
         "title": "FeatureOut",
         "type": "object"
       },
+      "FeaturePatch": {
+        "properties": {
+          "admin_area": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admin Area"
+          },
+          "commodities": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commodities"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "maxLength": 2,
+                "minLength": 2,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "location_precision": {
+            "anyOf": [
+              {
+                "enum": [
+                  "surveyed",
+                  "reported_coordinates",
+                  "georeferenced_map",
+                  "approximate",
+                  "district",
+                  "unknown"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location Precision"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "uncertainty_m": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set explicitly to null to mark uncertainty unknown",
+            "title": "Uncertainty M"
+          }
+        },
+        "title": "FeaturePatch",
+        "type": "object"
+      },
       "GapIn": {
         "properties": {
           "resolved_by_claim_id": {
@@ -1453,6 +1647,30 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "ImportIn": {
+        "properties": {
+          "classification": {
+            "default": "institutional",
+            "title": "Classification",
+            "type": "string"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "maxLength": 2,
+                "minLength": 2,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          }
+        },
+        "title": "ImportIn",
         "type": "object"
       },
       "IntersectionIn": {
@@ -2057,6 +2275,50 @@
             "default": "mineral_occurrence",
             "title": "Feature Type",
             "type": "string"
+          },
+          "hemisphere_basis": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why the reviewer chose these hemispheres",
+            "title": "Hemisphere Basis"
+          },
+          "lat_hemisphere": {
+            "anyOf": [
+              {
+                "enum": [
+                  "N",
+                  "S"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Required when the source does not state it",
+            "title": "Lat Hemisphere"
+          },
+          "lon_hemisphere": {
+            "anyOf": [
+              {
+                "enum": [
+                  "E",
+                  "W"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lon Hemisphere"
           },
           "name": {
             "maxLength": 300,
@@ -4817,6 +5079,72 @@
         ]
       }
     },
+    "/api/v1/documents/{document_id}/reextract": {
+      "post": {
+        "description": "Re-run claim extraction with the current rules on stored page text, without OCR.",
+        "operationId": "reextract_api_v1_documents__document_id__reextract_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "document_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Document Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Org-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Org-Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Reextract",
+        "tags": [
+          "documents"
+        ]
+      }
+    },
     "/api/v1/documents/{document_id}/status": {
       "get": {
         "operationId": "status_api_v1_documents__document_id__status_get",
@@ -5378,6 +5706,79 @@
           }
         ],
         "summary": "Get Feature",
+        "tags": [
+          "evidence"
+        ]
+      },
+      "patch": {
+        "operationId": "update_feature_api_v1_geological_features__feature_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "feature_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Feature Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Org-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Org-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeaturePatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeatureOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Feature",
         "tags": [
           "evidence"
         ]
@@ -7928,6 +8329,452 @@
         "summary": "Update Source",
         "tags": [
           "documents"
+        ]
+      }
+    },
+    "/api/v1/sources/{source_id}/catalog": {
+      "get": {
+        "operationId": "list_catalog_api_v1_sources__source_id__catalog_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Source Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "imported",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Imported"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Org-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Org-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Catalog Api V1 Sources  Source Id  Catalog Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Catalog",
+        "tags": [
+          "catalogue"
+        ]
+      }
+    },
+    "/api/v1/sources/{source_id}/catalog/{record_id}/import": {
+      "post": {
+        "description": "Download one listed document from the catalogue's own host and ingest it like an upload.",
+        "operationId": "import_record_api_v1_sources__source_id__catalog__record_id__import_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Source Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Record Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Org-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Org-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ImportIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Import Record Api V1 Sources  Source Id  Catalog  Record Id  Import Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Import Record",
+        "tags": [
+          "catalogue"
+        ]
+      }
+    },
+    "/api/v1/sources/{source_id}/connector": {
+      "put": {
+        "operationId": "configure_connector_api_v1_sources__source_id__connector_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Source Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Org-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Org-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectorConfig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Configure Connector Api V1 Sources  Source Id  Connector Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Configure Connector",
+        "tags": [
+          "catalogue"
+        ]
+      }
+    },
+    "/api/v1/sources/{source_id}/connector/probe": {
+      "post": {
+        "description": "Fetch one page and describe the catalogue's real structure. Nothing is stored.",
+        "operationId": "probe_connector_api_v1_sources__source_id__connector_probe_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Source Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Org-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Org-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Probe Connector Api V1 Sources  Source Id  Connector Probe Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Probe Connector",
+        "tags": [
+          "catalogue"
+        ]
+      }
+    },
+    "/api/v1/sources/{source_id}/harvest": {
+      "post": {
+        "operationId": "start_harvest_api_v1_sources__source_id__harvest_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Source Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "max_pages",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 10000,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Max Pages"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Org-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Org-Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Start Harvest",
+        "tags": [
+          "catalogue"
         ]
       }
     }

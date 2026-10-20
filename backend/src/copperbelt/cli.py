@@ -11,7 +11,8 @@ import uuid
 
 import structlog
 
-import copperbelt.services.documents  # noqa: F401  (registers job handlers)
+import copperbelt.connectors.catalog  # noqa: F401  (registers job handlers)
+import copperbelt.services.documents  # noqa: F401
 from copperbelt.config import get_settings
 from copperbelt.jobs.queue import drain, run_one
 

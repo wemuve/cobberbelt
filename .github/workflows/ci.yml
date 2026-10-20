@@ -45,6 +45,10 @@ jobs:
       - run: uv sync --frozen
       - name: Lint
         run: uv run ruff check src tests && uv run ruff format --check src tests
+      - name: Migrations match models
+        env:
+          CBI_DATABASE_OWNER_URL: postgresql+psycopg://copperbelt:devpassword@localhost:5432/copperbelt_test
+        run: uv run alembic upgrade head && uv run alembic check
       - name: Tests
         run: uv run pytest -o addopts="" -q -p no:warnings
       - name: Dependency vulnerability audit
