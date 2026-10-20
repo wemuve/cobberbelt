@@ -240,3 +240,26 @@ def test_error_responses_carry_request_id(client):
     assert r.json()["error"]["request_id"] == "trace-123"
     assert r.headers["X-Request-Id"] == "trace-123"
     assert r.headers["X-Content-Type-Options"] == "nosniff"
+
+
+def test_failed_commit_is_reported_not_acknowledged(owner, monkeypatch):
+    """The commit happens before the response: a commit failure must surface as an error, never a 2xx."""
+    from sqlalchemy.orm import Session
+
+    real_commit = Session.commit
+
+    def failing_commit(self):  # noqa: ANN001, ANN202
+        if self.info.get("org_id") and not self.info.get("system"):
+            raise RuntimeError("simulated commit failure")
+        return real_commit(self)
+
+    from fastapi.testclient import TestClient
+
+    from copperbelt.main import app
+
+    owner.client = TestClient(app, raise_server_exceptions=False)
+    monkeypatch.setattr(Session, "commit", failing_commit)
+    r = owner.post("/api/v1/projects", json={"name": "Never saved"})
+    assert r.status_code == 500
+    monkeypatch.setattr(Session, "commit", real_commit)
+    assert owner.get("/api/v1/projects").json() == []

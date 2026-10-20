@@ -189,3 +189,24 @@ def test_full_first_release_workflow(owner):
         "assessment.created",
         "assessment.approved",
     } <= actions
+
+
+def test_feature_uncertainty_is_never_invented_and_edits_are_audited(owner):
+    r = owner.post(
+        "/api/v1/geological-features",
+        json={
+            "name": "Sheet extent",
+            "feature_type": "survey_location",
+            "location_precision": "georeferenced_map",
+            "geometry": {"type": "Polygon", "coordinates": [[[25, -10], [26, -10], [26, -9], [25, -9], [25, -10]]]},
+        },
+    )
+    f = r.json()
+    assert r.status_code == 201 and f["uncertainty_m"] is None
+    assert any("No location uncertainty recorded" in w for w in f["warnings"])
+    p = owner.patch(f"/api/v1/geological-features/{f['id']}", json={"uncertainty_m": 500, "commodities": ["cuivre"]})
+    assert p.status_code == 200 and p.json()["uncertainty_m"] == 500 and p.json()["commodities"] == ["copper"]
+    p = owner.patch(f"/api/v1/geological-features/{f['id']}", json={"uncertainty_m": None})
+    assert p.json()["uncertainty_m"] is None
+    events = owner.get("/api/v1/audit-events", params={"action": "feature.updated"}).json()["items"]
+    assert len(events) == 2 and events[-1]["detail"]["after"] == {"uncertainty_m": "500.0", "commodities": "['copper']"}

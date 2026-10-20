@@ -98,7 +98,13 @@ def ctx(
 
 
 def require(permission: str):  # noqa: ANN201
-    def _dep(c: Ctx = Depends(ctx)) -> Ctx:
+    """Permission-checked request context.
+
+    scope="function" makes the transaction commit BEFORE the response is sent, so a client that
+    receives 2xx can rely on the change being durable and visible to its next request.
+    """
+
+    def _dep(c: Ctx = Depends(ctx, scope="function")) -> Ctx:
         c.require(permission)
         return c
 

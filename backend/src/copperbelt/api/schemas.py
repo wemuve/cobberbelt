@@ -279,6 +279,16 @@ class FeatureOut(BaseModel):
     created_at: datetime
 
 
+class FeaturePatch(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=300)
+    description: str | None = None
+    commodities: list[str] | None = None
+    uncertainty_m: float | None = Field(default=None, ge=0, description="Set explicitly to null to mark uncertainty unknown")
+    location_precision: Literal["surveyed", "reported_coordinates", "georeferenced_map", "approximate", "district", "unknown"] | None = None
+    admin_area: str | None = None
+    country: str | None = Field(default=None, min_length=2, max_length=2)
+
+
 class EvidenceLinkIn(BaseModel):
     claim_id: uuid.UUID
     relation: Literal["supports", "contradicts", "mentions"]

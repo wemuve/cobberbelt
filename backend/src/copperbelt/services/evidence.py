@@ -187,7 +187,9 @@ def create_feature(c, body) -> tuple[GeoFeature, list[str]]:  # noqa: ANN001
         geom_el = from_shape(geom, srid=4326)
     elif body.location_precision not in ("unknown", "district"):
         raise ValidationFailed("A geometry is required unless the location is unknown or only known at district level")
-    uncertainty = body.uncertainty_m if body.uncertainty_m is not None else default_uncertainty_m(body.location_precision)
+    # Never invent an uncertainty: only a value the user states is stored. (Coordinate-resolution
+    # defaults apply only when promoting a parsed coordinate, where the source's precision is known.)
+    uncertainty = body.uncertainty_m
     if body.geometry is not None and uncertainty is None:
         warnings.append("No location uncertainty recorded; the map will flag this feature as uncertainty-unknown")
     f = GeoFeature(
@@ -323,3 +325,30 @@ def promote_coordinate_claim(c, claim: Claim, body) -> tuple[GeoFeature, list[st
     )
     record_ctx(c, "feature.promoted_from_claim", "feature", f.id, claim_id=str(claim.id))
     return f, warnings
+
+
+PATCHABLE = {"name", "description", "commodities", "uncertainty_m", "location_precision", "admin_area", "country"}
+
+
+def patch_feature(c, f: GeoFeature, changes: dict) -> GeoFeature:  # noqa: ANN001
+    unknown = set(changes) - PATCHABLE
+    if unknown:
+        raise ValidationFailed(f"Fields cannot be edited here: {sorted(unknown)}")
+    before = {k: (str(getattr(f, k)) if getattr(f, k) is not None else None) for k in changes}
+    for k, v in changes.items():
+        if k == "commodities":
+            v = norm_commodities(v)
+        elif k == "location_precision":
+            v = LocationPrecision(v)
+        elif k == "country" and v:
+            v = v.upper()
+        setattr(f, k, v)
+    record_ctx(
+        c,
+        "feature.updated",
+        "feature",
+        f.id,
+        before=before,
+        after={k: (str(getattr(f, k)) if getattr(f, k) is not None else None) for k in changes},
+    )
+    return f

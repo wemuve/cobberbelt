@@ -14,6 +14,7 @@ from copperbelt.api.schemas import (
     EvidenceLinkIn,
     FeatureIn,
     FeatureOut,
+    FeaturePatch,
     IntersectionIn,
     PromoteClaimIn,
     ReviewIn,
@@ -146,6 +147,13 @@ def link_feature_evidence(feature_id: uuid.UUID, body: EvidenceLinkIn, c: Ctx = 
     f = ev.get_feature(c, feature_id)
     ev.link_evidence(c, f, body.claim_id, body.relation, body.note)
     return ev.feature_evidence(c, f)
+
+
+@router.patch("/geological-features/{feature_id}", response_model=FeatureOut)
+def update_feature(feature_id: uuid.UUID, body: FeaturePatch, c: Ctx = Depends(require("features:write"))) -> dict:
+    f = ev.get_feature(c, feature_id)
+    ev.patch_feature(c, f, body.model_dump(exclude_unset=True))
+    return ev.feature_out(f, ev.evidence_counts(c, [f.id]).get(f.id))
 
 
 @router.post("/geological-features/{feature_id}/review", response_model=FeatureOut)

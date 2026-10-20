@@ -19,3 +19,6 @@ node_modules/
 frontend/out/
 # OS
 .DS_Store
+frontend/e2e-shots/
+*.pdf
+!backend/tests/**/*.pdf
