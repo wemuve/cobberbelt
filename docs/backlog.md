@@ -15,7 +15,9 @@ The workflow: ingest authorised documents → extract and review evidence → se
 | 1.5 | Upload validation, dedupe, storage, checksum verify | ✅ | Type sniffing, size limit, empty-file, unauthorised-source tests |
 | 1.6 | Malware scanning | 🟡 | clamd INSTREAM implemented; **needs a clamd instance + EICAR test in staging** |
 | 1.7 | Async processing, retry, dead-letter, recovery | ✅ | Transient retry, permanent failure → dead → admin retry, stale-lock recovery tests |
-| 1.8 | Text-layer + OCR (eng/fra), page persistence, versions | ✅ synthetic / ⛔ real | **Blocked on real historical documents** to measure CER and set thresholds |
+| 1.8 | Text-layer + OCR (eng/fra), page persistence, versions | ✅ synthetic / 🟡 real | 2 real documents processed (73 pages). Prose OCR works well (80.6% mean confidence); maps and tables are weak. CER thresholds need a hand-transcribed sample (30–50 pages) |
+| 1.8b | Station-table coordinates with reviewer-stated hemisphere | ✅ | 77% row recall, 1 silent OCR digit error in 20 checked rows; review against the image is enforced |
+| 1.8c | Job heartbeat and fencing for long jobs | ✅ | Regression test; a live recovery after a killed worker was observed |
 | 1.9 | Rule-based claim candidates with offsets | ✅ | Offsets reproduce excerpt exactly; coordinate parser tests (DMS, decimal, FR/EN hemispheres) |
 | 1.10 | Review workflow + immutable decision history | ✅ | Comment required for reject; history append-only |
 | 1.11 | Features: CRS transform, validity, uncertainty, conflicts | ✅ | UTM→WGS84 test; bow-tie rejected; conflict flag in evidence + map |
@@ -29,6 +31,12 @@ The workflow: ingest authorised documents → extract and review evidence → se
 | 1.19 | Staging environment + production deployment target | ⬜ | Needs a hosting decision (data-residency note in configuration-matrix.md) |
 
 ## List 2 — Next validated release (only after List 1 is used by real customers)
+
+**Re-prioritised on 2026-10-21 from real archive documents** (see evaluation.md). These come first:
+1. **Map-sheet path:** georeferencing from printed graticule corners (GeoTIFF output), region OCR limited to the legend and title block, and a zoomable tile viewer for large scans. The first two real documents included a map sheet; a 1:200,000 sheet is unreadable at page width.
+2. **Layout-aware table OCR** (cell-level), benchmarked on the Hermans station table (78 rows, printed ground truth); evaluate managed OCR here first.
+3. **Page-batch parallel OCR jobs:** at about 14 s per page, a single 72-page report holds one worker for 16 minutes.
+4. **Per-block OCR confidence,** so noisy map-body text is down-weighted in search and flagged in review.
 
 - Embedding-based semantic retrieval, gated on a relevance evaluation showing improvement.
 - LLM-assisted extraction (tables, assay intervals, borehole collars) writing the same reviewed-claim schema.
