@@ -28,7 +28,11 @@ Environment: one worker, Tesseract 5 `eng+fra`, 300 dpi rendering, development V
   - **Recall:** 60 of 78 table rows (77%). The 16 unparsed rows have OCR-merged digits (`11332`, `25846`) and are left for manual entry.
   - **Precision against the printed page (rows 1–26):** every parsed row matches except one. Bangiliwe reads `3 03 28` in the OCR but `3 53 28` in print, a 50′ error of about 92 km that is syntactically perfect and cannot be caught by pattern checks. **Review against the page image is therefore mandatory; it is not optional QA.**
   - **Hemisphere:** the table gives no N/S/E/W. Signs appear only near the equator (`+` north, `—` south). Unsigned rows are north by convention, which is an inference, not a statement. Parsed rows therefore keep absolute values only, and a reviewer must state the hemispheres, with a reason, before a location can be mapped.
-- **A real historical conflict:** for Basoko, the text cites Delporte & Gillis (1891) at 1°13′47″, while the table gives 1°13′32″. Both should be kept as separate claims on one feature with `contradicts`, which is the purpose of the evidence model.
+- **Two positions for Basoko, which are not a conflict:** the text (p. 10) cites Delporte & Gillis (1891) at φ = 1°13′47″, λ = 23°39′21″; the table (p. 41) gives 1°13′32″, 23°37′15″.
+  - An earlier draft of this log called this a contradiction. A re-read shows the 1891 pillar "a disparu", so it is a different, earlier station about 3.9 km east.
+  - It is now recorded as a separate claim linked with `mentions`, not `contradicts`, on the feature "Basoko magnetic station (Hermans 1937)".
+  - Lesson: telling a disagreement from two different things being measured needs a person who reads the context. The platform must not auto-classify it.
+  - OCR merged the table's latitude digits (`11332`), so the reviewer read that value from the page image. This is recorded in the claim's `read_from` attribute.
 - **A defect found and fixed: double processing.** The job ran longer than the 900 s lock timeout, and a second worker reclaimed it while it was still running. Fix: a 30 s lock heartbeat and fencing. Progress reports and final results are accepted only from the worker that holds the lock, and a superseded worker steps aside without touching document state. Regression tests were added. After the fix, the interrupted job was left to recover on its own as a live test.
 - **Another defect found and fixed:** reprocessing re-created duplicates of claims a person had already reviewed. Duplicates of reviewed passages are now skipped.
 
