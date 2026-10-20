@@ -85,7 +85,9 @@ class Risk(IdMixin, TimestampMixin, TenantMixin, Base):
 
     project_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(300), nullable=False)
-    category: Mapped[str] = mapped_column(String(40), nullable=False)  # geological, title, environmental, infrastructure, financial, social, data_quality
+    category: Mapped[str] = mapped_column(
+        String(40), nullable=False
+    )  # geological, title, environmental, infrastructure, financial, social, data_quality
     description: Mapped[str | None] = mapped_column(Text)
     severity: Mapped[int] = mapped_column(Integer, nullable=False)  # 1-5, defined in docs/scoring.md
     likelihood: Mapped[int] = mapped_column(Integer, nullable=False)  # 1-5

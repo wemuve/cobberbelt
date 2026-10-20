@@ -19,8 +19,12 @@ import pytest
 TEST_DB = os.environ.get("CBI_TEST_DB", "copperbelt_test")
 HOST = os.environ.get("CBI_TEST_DB_HOST", "localhost")
 os.environ["CBI_ENVIRONMENT"] = "test"
-os.environ["CBI_DATABASE_URL"] = f"postgresql+psycopg://copperbelt_app:{os.environ.get('CBI_TEST_APP_PASSWORD', 'devpassword')}@{HOST}:5432/{TEST_DB}"
-os.environ["CBI_DATABASE_OWNER_URL"] = f"postgresql+psycopg://copperbelt:{os.environ.get('CBI_TEST_OWNER_PASSWORD', 'devpassword')}@{HOST}:5432/{TEST_DB}"
+os.environ["CBI_DATABASE_URL"] = (
+    f"postgresql+psycopg://copperbelt_app:{os.environ.get('CBI_TEST_APP_PASSWORD', 'devpassword')}@{HOST}:5432/{TEST_DB}"
+)
+os.environ["CBI_DATABASE_OWNER_URL"] = (
+    f"postgresql+psycopg://copperbelt:{os.environ.get('CBI_TEST_OWNER_PASSWORD', 'devpassword')}@{HOST}:5432/{TEST_DB}"
+)
 os.environ.setdefault("CBI_RATE_LIMIT_PER_MINUTE", "100000")
 os.environ.setdefault("CBI_LOGIN_RATE_LIMIT_PER_MINUTE", "100000")
 for k in ("CBI_PLANET_API_KEY", "CBI_LLM_API_KEY", "CBI_EMBEDDING_API_KEY", "CBI_CLAMAV_HOST"):
@@ -112,8 +116,7 @@ class Actor:
 
 def register(client: TestClient, org: str = "Test Org") -> Actor:
     email = f"{uuid.uuid4().hex[:8]}@example.com"
-    r = client.post("/api/v1/auth/register", json={"email": email, "full_name": "Owner", "password": PASSWORD,
-                                                   "organisation_name": org})
+    r = client.post("/api/v1/auth/register", json={"email": email, "full_name": "Owner", "password": PASSWORD, "organisation_name": org})
     assert r.status_code == 201, r.text
     token = r.json()["access_token"]
     me = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"}).json()
@@ -122,8 +125,7 @@ def register(client: TestClient, org: str = "Test Org") -> Actor:
 
 def add_member(owner: Actor, role: str) -> Actor:
     email = f"{role}-{uuid.uuid4().hex[:6]}@example.com"
-    r = owner.post("/api/v1/org/members", json={"email": email, "full_name": role.title(), "role": role,
-                                                "initial_password": PASSWORD})
+    r = owner.post("/api/v1/org/members", json={"email": email, "full_name": role.title(), "role": role, "initial_password": PASSWORD})
     assert r.status_code == 201, r.text
     token = owner.client.post("/api/v1/auth/login", json={"email": email, "password": PASSWORD}).json()["access_token"]
     return Actor(owner.client, token, owner.org_id, r.json()["user_id"], email)
@@ -135,8 +137,15 @@ def owner(client) -> Actor:  # noqa: ANN001
 
 
 def make_source(actor: Actor, access_status: str = "public_domain", name: str | None = None) -> str:
-    r = actor.post("/api/v1/sources", json={"name": name or f"Source {uuid.uuid4().hex[:6]}", "access_status": access_status,
-                                            "licence": "Synthetic test content", "country": "CD"})
+    r = actor.post(
+        "/api/v1/sources",
+        json={
+            "name": name or f"Source {uuid.uuid4().hex[:6]}",
+            "access_status": access_status,
+            "licence": "Synthetic test content",
+            "country": "CD",
+        },
+    )
     assert r.status_code == 201, r.text
     return r.json()["id"]
 

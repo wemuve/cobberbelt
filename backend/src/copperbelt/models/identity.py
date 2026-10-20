@@ -48,9 +48,7 @@ class Membership(IdMixin, TimestampMixin, Base):
     __table_args__ = (UniqueConstraint("user_id", "org_id"),)
 
     user_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    org_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("organisations.id", ondelete="CASCADE"), nullable=False, index=True
-    )
+    org_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("organisations.id", ondelete="CASCADE"), nullable=False, index=True)
     role: Mapped[Role] = mapped_column(Enum(Role, name="org_role"), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 

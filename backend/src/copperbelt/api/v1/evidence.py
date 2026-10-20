@@ -59,8 +59,7 @@ def list_claims(
         q = q.where(Claim.commodities.any(ev.norm_commodities([commodity])[0]))
     total = c.db.scalar(select(func.count()).select_from(q.subquery()))
     rows = c.db.scalars(q.order_by(Claim.document_id, Claim.page_number, Claim.char_start).limit(limit).offset(offset)).all()
-    return {"total": total, "limit": limit, "offset": offset,
-            "items": [ClaimOut.model_validate(r).model_dump(mode="json") for r in rows]}
+    return {"total": total, "limit": limit, "offset": offset, "items": [ClaimOut.model_validate(r).model_dump(mode="json") for r in rows]}
 
 
 @router.post("/claims", response_model=ClaimOut, status_code=201)
@@ -117,8 +116,12 @@ def list_features(
     total = c.db.scalar(select(func.count()).select_from(q.subquery()))
     rows = c.db.scalars(q.order_by(GeoFeature.name).limit(limit).offset(offset)).all()
     counts = ev.evidence_counts(c, [f.id for f in rows])
-    return {"total": total, "limit": limit, "offset": offset,
-            "items": [FeatureOut.model_validate(ev.feature_out(f, counts.get(f.id))).model_dump(mode="json") for f in rows]}
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "items": [FeatureOut.model_validate(ev.feature_out(f, counts.get(f.id))).model_dump(mode="json") for f in rows],
+    }
 
 
 @router.post("/geological-features", response_model=FeatureOut, status_code=201)
@@ -159,11 +162,23 @@ def review_feature(feature_id: uuid.UUID, body: ReviewIn, c: Ctx = Depends(requi
 def run_search(body: SearchIn, c: Ctx = Depends(require("search:run"))) -> dict:
     if not (body.q or body.commodities or body.geometry or body.bbox or body.country):
         raise ValidationFailed("Provide a query, commodity, country or area to search")
-    return search(c, SearchQuery(
-        q=body.q, commodities=body.commodities, country=body.country, document_type=body.document_type,
-        source_id=body.source_id, year_from=body.year_from, year_to=body.year_to, review_status=body.review_status,
-        geometry=body.geometry.model_dump() if body.geometry else None, bbox=body.bbox, limit=body.limit, offset=body.offset,
-    ))
+    return search(
+        c,
+        SearchQuery(
+            q=body.q,
+            commodities=body.commodities,
+            country=body.country,
+            document_type=body.document_type,
+            source_id=body.source_id,
+            year_from=body.year_from,
+            year_to=body.year_to,
+            review_status=body.review_status,
+            geometry=body.geometry.model_dump() if body.geometry else None,
+            bbox=body.bbox,
+            limit=body.limit,
+            offset=body.offset,
+        ),
+    )
 
 
 # ------------------------------------------------------------------ geospatial
@@ -172,17 +187,39 @@ def run_search(body: SearchIn, c: Ctx = Depends(require("search:run"))) -> dict:
 @router.get("/geo/layers")
 def layers(c: Ctx = Depends(require("features:read"))) -> list[dict]:
     """Layers that actually have data or a configured provider. Nothing is listed as available speculatively."""
-    n_features = c.db.scalar(select(func.count()).select_from(GeoFeature).where(GeoFeature.org_id == c.org_id, GeoFeature.deleted_at.is_(None), GeoFeature.geom.is_not(None)))
+    n_features = c.db.scalar(
+        select(func.count())
+        .select_from(GeoFeature)
+        .where(GeoFeature.org_id == c.org_id, GeoFeature.deleted_at.is_(None), GeoFeature.geom.is_not(None))
+    )
     n_aoi = c.db.scalar(select(func.count()).select_from(AreaOfInterest).where(AreaOfInterest.org_id == c.org_id))
     return [
-        {"id": "geological_features", "title": "Geological features & occurrences", "status": "available", "count": n_features,
-         "url": "/api/v1/geo/features"},
-        {"id": "areas_of_interest", "title": "Project areas of interest", "status": "available", "count": n_aoi,
-         "url": "/api/v1/geo/features?layer=areas_of_interest"},
-        {"id": "mining_cadastre", "title": "Mining licences (ZM / CD)", "status": "blocked",
-         "reason": "No authorised cadastre access configured; see docs/source-register.md"},
-        {"id": "satellite_imagery", "title": "Satellite imagery (Planet)", "status": "blocked",
-         "reason": "Planet API key and licence terms not yet provided"},
+        {
+            "id": "geological_features",
+            "title": "Geological features & occurrences",
+            "status": "available",
+            "count": n_features,
+            "url": "/api/v1/geo/features",
+        },
+        {
+            "id": "areas_of_interest",
+            "title": "Project areas of interest",
+            "status": "available",
+            "count": n_aoi,
+            "url": "/api/v1/geo/features?layer=areas_of_interest",
+        },
+        {
+            "id": "mining_cadastre",
+            "title": "Mining licences (ZM / CD)",
+            "status": "blocked",
+            "reason": "No authorised cadastre access configured; see docs/source-register.md",
+        },
+        {
+            "id": "satellite_imagery",
+            "title": "Satellite imagery (Planet)",
+            "status": "blocked",
+            "reason": "Planet API key and licence terms not yet provided",
+        },
         {"id": "infrastructure", "title": "Infrastructure", "status": "planned", "reason": "Not in the first release"},
     ]
 
@@ -204,9 +241,20 @@ def geo_features(
         if env is not None:
             q = q.where(func.ST_Intersects(AreaOfInterest.geom, env))
         rows = c.db.scalars(q.limit(limit)).all()
-        feats = [{"type": "Feature", "id": str(a.id), "geometry": to_geojson(a.geom),
-                  "properties": {"layer": layer, "name": a.name, "project_id": str(a.project_id) if a.project_id else None,
-                                 "area_km2": a.area_km2}} for a in rows]
+        feats = [
+            {
+                "type": "Feature",
+                "id": str(a.id),
+                "geometry": to_geojson(a.geom),
+                "properties": {
+                    "layer": layer,
+                    "name": a.name,
+                    "project_id": str(a.project_id) if a.project_id else None,
+                    "area_km2": a.area_km2,
+                },
+            }
+            for a in rows
+        ]
     else:
         q = select(GeoFeature).where(GeoFeature.org_id == c.org_id, GeoFeature.deleted_at.is_(None), GeoFeature.geom.is_not(None))
         if env is not None:
@@ -216,13 +264,26 @@ def geo_features(
         feats = []
         for f in rows:
             ec = counts.get(f.id, {})
-            feats.append({"type": "Feature", "id": str(f.id), "geometry": to_geojson(f.geom), "properties": {
-                "layer": layer, "name": f.name, "feature_type": f.feature_type, "commodities": f.commodities,
-                "location_precision": str(f.location_precision), "uncertainty_m": f.uncertainty_m,
-                "uncertainty_known": f.uncertainty_m is not None, "review_status": str(f.review_status),
-                "supporting": ec.get("supports", 0), "contradicting": ec.get("contradicts", 0),
-                "has_conflict": bool(ec.get("supports") and ec.get("contradicts")),
-            }})
+            feats.append(
+                {
+                    "type": "Feature",
+                    "id": str(f.id),
+                    "geometry": to_geojson(f.geom),
+                    "properties": {
+                        "layer": layer,
+                        "name": f.name,
+                        "feature_type": f.feature_type,
+                        "commodities": f.commodities,
+                        "location_precision": str(f.location_precision),
+                        "uncertainty_m": f.uncertainty_m,
+                        "uncertainty_known": f.uncertainty_m is not None,
+                        "review_status": str(f.review_status),
+                        "supporting": ec.get("supports", 0),
+                        "contradicting": ec.get("contradicts", 0),
+                        "has_conflict": bool(ec.get("supports") and ec.get("contradicts")),
+                    },
+                }
+            )
     return {"type": "FeatureCollection", "features": feats, "truncated": len(feats) >= limit}
 
 
@@ -232,28 +293,49 @@ def intersections(body: IntersectionIn, c: Ctx = Depends(require("features:read"
     area = from_shape(geom, srid=4326)
     out: dict = {"input_crs": crs_label, "buffer_m": body.buffer_m, "warnings": warnings}
     if "features" in body.layers:
-        cond = (func.ST_DWithin(func.Geography(GeoFeature.geom), func.Geography(area), body.buffer_m)
-                if body.buffer_m else func.ST_Intersects(GeoFeature.geom, area))
+        cond = (
+            func.ST_DWithin(func.Geography(GeoFeature.geom), func.Geography(area), body.buffer_m)
+            if body.buffer_m
+            else func.ST_Intersects(GeoFeature.geom, area)
+        )
         dist = func.ST_Distance(func.Geography(GeoFeature.geom), func.Geography(area))
-        rows = c.db.execute(select(GeoFeature, dist.label("d")).where(
-            GeoFeature.org_id == c.org_id, GeoFeature.deleted_at.is_(None), cond).order_by("d").limit(500)).all()
-        out["features"] = [{**FeatureOut.model_validate(ev.feature_out(f)).model_dump(mode="json"),
-                            "distance_m": round(float(d), 1),
-                            # A feature whose uncertainty radius exceeds its distance may lie on either side of the boundary.
-                            "boundary_ambiguous": f.uncertainty_m is None or f.uncertainty_m >= float(d)}
-                           for f, d in rows]
+        rows = c.db.execute(
+            select(GeoFeature, dist.label("d"))
+            .where(GeoFeature.org_id == c.org_id, GeoFeature.deleted_at.is_(None), cond)
+            .order_by("d")
+            .limit(500)
+        ).all()
+        out["features"] = [
+            {
+                **FeatureOut.model_validate(ev.feature_out(f)).model_dump(mode="json"),
+                "distance_m": round(float(d), 1),
+                # A feature whose uncertainty radius exceeds its distance may lie on either side of the boundary.
+                "boundary_ambiguous": f.uncertainty_m is None or f.uncertainty_m >= float(d),
+            }
+            for f, d in rows
+        ]
     if "areas_of_interest" in body.layers:
-        rows = c.db.scalars(select(AreaOfInterest).where(AreaOfInterest.org_id == c.org_id,
-                                                         func.ST_Intersects(AreaOfInterest.geom, area))).all()
-        out["areas_of_interest"] = [{"id": str(a.id), "name": a.name, "project_id": str(a.project_id) if a.project_id else None}
-                                    for a in rows]
+        rows = c.db.scalars(
+            select(AreaOfInterest).where(AreaOfInterest.org_id == c.org_id, func.ST_Intersects(AreaOfInterest.geom, area))
+        ).all()
+        out["areas_of_interest"] = [
+            {"id": str(a.id), "name": a.name, "project_id": str(a.project_id) if a.project_id else None} for a in rows
+        ]
     out["not_checked"] = ["mining_cadastre (no authorised connector)", "protected_areas (no dataset loaded)"]
     return out
 
 
 def _aoi_out(a: AreaOfInterest, warnings: list[str] | None = None) -> dict:
-    return {"id": a.id, "name": a.name, "project_id": a.project_id, "geometry": to_geojson(a.geom),
-            "source_crs": a.source_crs, "area_km2": a.area_km2, "warnings": warnings or [], "created_at": a.created_at}
+    return {
+        "id": a.id,
+        "name": a.name,
+        "project_id": a.project_id,
+        "geometry": to_geojson(a.geom),
+        "source_crs": a.source_crs,
+        "area_km2": a.area_km2,
+        "warnings": warnings or [],
+        "created_at": a.created_at,
+    }
 
 
 @router.post("/areas-of-interest", response_model=AOIOut, status_code=201)
@@ -263,8 +345,15 @@ def create_aoi(body: AOIIn, c: Ctx = Depends(require("aoi:write"))) -> dict:
     geom, crs_label, warnings = to_storage_geometry(body.geometry.model_dump(), body.source_crs)
     if geom.geom_type not in ("Polygon", "MultiPolygon"):
         raise ValidationFailed("An area of interest must be a Polygon or MultiPolygon")
-    a = AreaOfInterest(org_id=c.org_id, project_id=body.project_id, name=body.name, geom=from_shape(geom, srid=4326),
-                       source_crs=crs_label, area_km2=area_km2(geom), created_by=c.user.id)
+    a = AreaOfInterest(
+        org_id=c.org_id,
+        project_id=body.project_id,
+        name=body.name,
+        geom=from_shape(geom, srid=4326),
+        source_crs=crs_label,
+        area_km2=area_km2(geom),
+        created_by=c.user.id,
+    )
     c.db.add(a)
     c.db.flush()
     record_ctx(c, "aoi.created", "area_of_interest", a.id, project_id=str(body.project_id) if body.project_id else None)

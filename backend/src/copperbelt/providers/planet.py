@@ -31,7 +31,7 @@ class PlanetProvider(Provider):
         purpose="Search and order satellite imagery for areas of interest; change monitoring",
         requires=["CBI_PLANET_API_KEY"],
         licence_notes="Commercial licence. Confirm permitted analytical use, storage duration, display to end "
-                      "customers and redistribution before enabling customer-facing imagery.",
+        "customers and redistribution before enabling customer-facing imagery.",
         docs_url="https://docs.planet.com/develop/apis/",
         capabilities=["scene_search", "orders"],
     )
@@ -49,8 +49,9 @@ class PlanetProvider(Provider):
         if r.status_code in (401, 403):
             raise ProviderUnavailable("Planet rejected the credentials or this account lacks access", code="provider_auth")
         if r.status_code == 429:
-            raise ProviderUnavailable("Planet rate limit reached; retry later", code="provider_rate_limited",
-                                      detail={"retry_after": r.headers.get("Retry-After")})
+            raise ProviderUnavailable(
+                "Planet rate limit reached; retry later", code="provider_rate_limited", detail={"retry_after": r.headers.get("Retry-After")}
+            )
         if r.status_code >= 400:
             raise ProviderUnavailable(f"Planet error {r.status_code}: {r.text[:300]}", code="provider_error")
 
@@ -70,16 +71,27 @@ class PlanetProvider(Provider):
             raise ValidationFailed("date_to must be on or after date_from")
         filters: list[dict[str, Any]] = [
             {"type": "GeometryFilter", "field_name": "geometry", "config": geometry},
-            {"type": "DateRangeFilter", "field_name": "acquired",
-             "config": {"gte": f"{date_from.isoformat()}T00:00:00Z", "lte": f"{date_to.isoformat()}T23:59:59Z"}},
+            {
+                "type": "DateRangeFilter",
+                "field_name": "acquired",
+                "config": {"gte": f"{date_from.isoformat()}T00:00:00Z", "lte": f"{date_to.isoformat()}T23:59:59Z"},
+            },
         ]
         if max_cloud is not None:
             filters.append({"type": "RangeFilter", "field_name": "cloud_cover", "config": {"lte": max_cloud}})
         return {"type": "AndFilter", "config": filters}
 
-    def search_scenes(self, geometry: dict[str, Any], date_from: date, date_to: date, *,
-                      item_types: list[str] | None = None, max_cloud: float | None = 0.2, limit: int = 50,
-                      org_id=None) -> dict[str, Any]:  # noqa: ANN001
+    def search_scenes(
+        self,
+        geometry: dict[str, Any],
+        date_from: date,
+        date_to: date,
+        *,
+        item_types: list[str] | None = None,
+        max_cloud: float | None = 0.2,
+        limit: int = 50,
+        org_id=None,
+    ) -> dict[str, Any]:  # noqa: ANN001
         types = item_types or ["PSScene"]
         if bad := set(types) - SUPPORTED_ITEM_TYPES:
             raise ValidationFailed(f"Unsupported item types: {sorted(bad)}")
@@ -91,17 +103,33 @@ class PlanetProvider(Provider):
         scenes = []
         for f in r.json().get("features", [])[:limit]:
             p = f.get("properties", {})
-            scenes.append({
-                "id": f.get("id"), "item_type": p.get("item_type"), "acquired": p.get("acquired"),
-                "cloud_cover": p.get("cloud_cover"), "clear_percent": p.get("clear_percent"),
-                "gsd_m": p.get("gsd") or p.get("pixel_resolution"), "satellite_id": p.get("satellite_id"),
-                "instrument": p.get("instrument"), "quality_category": p.get("quality_category"),
-                "geometry": f.get("geometry"), "assets_permitted": f.get("_permissions", []),
-            })
+            scenes.append(
+                {
+                    "id": f.get("id"),
+                    "item_type": p.get("item_type"),
+                    "acquired": p.get("acquired"),
+                    "cloud_cover": p.get("cloud_cover"),
+                    "clear_percent": p.get("clear_percent"),
+                    "gsd_m": p.get("gsd") or p.get("pixel_resolution"),
+                    "satellite_id": p.get("satellite_id"),
+                    "instrument": p.get("instrument"),
+                    "quality_category": p.get("quality_category"),
+                    "geometry": f.get("geometry"),
+                    "assets_permitted": f.get("_permissions", []),
+                }
+            )
         return {"provider": "planet", "scenes": scenes, "count": len(scenes), "request_filter": body["filter"]}
 
-    def create_order(self, name: str, item_ids: list[str], item_type: str, product_bundle: str,
-                     clip_geometry: dict[str, Any] | None, idempotency_key: str, org_id=None) -> dict[str, Any]:  # noqa: ANN001
+    def create_order(
+        self,
+        name: str,
+        item_ids: list[str],
+        item_type: str,
+        product_bundle: str,
+        clip_geometry: dict[str, Any] | None,
+        idempotency_key: str,
+        org_id=None,
+    ) -> dict[str, Any]:  # noqa: ANN001
         """Create an order. The caller must persist the returned order id and only treat
         delivery as successful once the order reaches state 'success'."""
         if not item_ids:
@@ -130,7 +158,9 @@ class PlanetProvider(Provider):
         data = r.json()
         results = data.get("_links", {}).get("results", []) or []
         return {
-            "order_id": data.get("id"), "state": data.get("state"), "last_message": data.get("last_message"),
+            "order_id": data.get("id"),
+            "state": data.get("state"),
+            "last_message": data.get("last_message"),
             "delivered": data.get("state") == "success",
             "results": [{"name": x.get("name"), "expires_at": x.get("expires_at")} for x in results],
         }

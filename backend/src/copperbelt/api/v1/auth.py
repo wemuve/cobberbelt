@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Header, Request, Response
 from sqlalchemy import select
 
 from copperbelt.api.ratelimit import limiter
-from copperbelt.api.schemas import LoginIn, MeOut, MembershipOut, RegisterIn, TokenOut
+from copperbelt.api.schemas import LoginIn, MembershipOut, MeOut, RegisterIn, TokenOut
 from copperbelt.config import get_settings
 from copperbelt.db import system_session
 from copperbelt.errors import Conflict, Unauthorized, ValidationFailed
@@ -36,9 +36,13 @@ def _client_ip(request: Request) -> str:
 def _issue(response: Response, user: User) -> TokenOut:
     s = get_settings()
     response.set_cookie(
-        REFRESH_COOKIE, create_token(user.id, user.token_version, "refresh"),
-        max_age=s.refresh_token_days * 86400, httponly=True, samesite="strict",
-        secure=s.environment in ("staging", "production"), path="/api/v1/auth",
+        REFRESH_COOKIE,
+        create_token(user.id, user.token_version, "refresh"),
+        max_age=s.refresh_token_days * 86400,
+        httponly=True,
+        samesite="strict",
+        secure=s.environment in ("staging", "production"),
+        path="/api/v1/auth",
     )
     return TokenOut(access_token=create_token(user.id, user.token_version, "access"), expires_in=s.access_token_minutes * 60)
 
@@ -64,8 +68,16 @@ def register(body: RegisterIn, request: Request, response: Response) -> TokenOut
         db.add_all([user, org])
         db.flush()
         db.add(Membership(user_id=user.id, org_id=org.id, role=Role.owner))
-        record(db, "auth.registered", org_id=org.id, actor_id=user.id, entity_type="organisation", entity_id=org.id,
-               request_id=getattr(request.state, "request_id", None), ip=_client_ip(request))
+        record(
+            db,
+            "auth.registered",
+            org_id=org.id,
+            actor_id=user.id,
+            entity_type="organisation",
+            entity_id=org.id,
+            request_id=getattr(request.state, "request_id", None),
+            ip=_client_ip(request),
+        )
         db.flush()
         return _issue(response, user)
 
@@ -83,9 +95,15 @@ def login(body: LoginIn, request: Request, response: Response) -> TokenOut:
             ok = False
         else:
             ok = user.is_active and verify_password(user.password_hash, body.password)
-        record(db, "auth.login_succeeded" if ok else "auth.login_failed", org_id=None,
-               actor_id=user.id if user else None, detail={"email": body.email.lower()} if not ok else {},
-               request_id=getattr(request.state, "request_id", None), ip=ip)
+        record(
+            db,
+            "auth.login_succeeded" if ok else "auth.login_failed",
+            org_id=None,
+            actor_id=user.id if user else None,
+            detail={"email": body.email.lower()} if not ok else {},
+            request_id=getattr(request.state, "request_id", None),
+            ip=ip,
+        )
         if not ok:
             db.commit()
             raise Unauthorized("Invalid email or password", code="invalid_credentials")
@@ -118,8 +136,14 @@ def logout_all(request: Request, response: Response, user: User = Depends(curren
     with system_session() as db:
         u = db.get(User, user.id)
         u.token_version += 1
-        record(db, "auth.sessions_revoked", org_id=None, actor_id=user.id,
-               request_id=getattr(request.state, "request_id", None), ip=_client_ip(request))
+        record(
+            db,
+            "auth.sessions_revoked",
+            org_id=None,
+            actor_id=user.id,
+            request_id=getattr(request.state, "request_id", None),
+            ip=_client_ip(request),
+        )
     response.delete_cookie(REFRESH_COOKIE, path="/api/v1/auth")
     response.status_code = 204
     return response
@@ -130,6 +154,8 @@ def me(user: User = Depends(current_user)) -> MeOut:
     with system_session() as db:
         rows = db.scalars(select(Membership).where(Membership.user_id == user.id, Membership.is_active.is_(True))).all()
         return MeOut(
-            id=user.id, email=user.email, full_name=user.full_name,
+            id=user.id,
+            email=user.email,
+            full_name=user.full_name,
             memberships=[MembershipOut(org_id=m.org_id, org_name=m.organisation.name, role=str(m.role)) for m in rows],
         )

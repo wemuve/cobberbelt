@@ -56,12 +56,28 @@ PROVIDERS: dict[str, Provider] = {p.info.id: p for p in (planet, pvgis, llm, emb
 
 # Data sources that are registered but have no connector, with the reason.
 UNCONNECTED_SOURCES = [
-    {"id": "zm_mining_cadastre", "name": "Zambia Mining Cadastre (Ministry of Mines and Minerals Development)",
-     "status": "blocked", "reason": "Access method and terms not yet established; see docs/source-register.md"},
-    {"id": "cd_cami", "name": "DRC Cadastre Minier (CAMI)", "status": "blocked",
-     "reason": "Access method and terms not yet established; see docs/source-register.md"},
-    {"id": "rdc_rocks", "name": "RDC Rocks", "status": "blocked",
-     "reason": "No confirmed public API or licence for automated extraction or commercial reuse"},
-    {"id": "unilu_archive", "name": "University of Lubumbashi geological archive", "status": "blocked",
-     "reason": "Requires an institutional data-sharing agreement"},
+    {
+        "id": "zm_mining_cadastre",
+        "name": "Zambia Mining Cadastre (Ministry of Mines and Minerals Development)",
+        "status": "blocked",
+        "reason": "Access method and terms not yet established; see docs/source-register.md",
+    },
+    {
+        "id": "cd_cami",
+        "name": "DRC Cadastre Minier (CAMI)",
+        "status": "blocked",
+        "reason": "Access method and terms not yet established; see docs/source-register.md",
+    },
+    {
+        "id": "rdc_rocks",
+        "name": "RDC Rocks",
+        "status": "blocked",
+        "reason": "No confirmed public API or licence for automated extraction or commercial reuse",
+    },
+    {
+        "id": "unilu_archive",
+        "name": "University of Lubumbashi geological archive",
+        "status": "blocked",
+        "reason": "Requires an institutional data-sharing agreement",
+    },
 ]

@@ -73,8 +73,9 @@ def update_project(project_id: uuid.UUID, body: ProjectIn, c: Ctx = Depends(requ
 @router.post("/{project_id}/members", status_code=204)
 def add_project_member(project_id: uuid.UUID, body: ProjectMemberIn, c: Ctx = Depends(require("projects:write"))) -> None:
     p = svc.get_project(c, project_id, write=True)
-    if not c.db.scalar(select(Membership).where(Membership.user_id == body.user_id, Membership.org_id == c.org_id,
-                                                Membership.is_active.is_(True))):
+    if not c.db.scalar(
+        select(Membership).where(Membership.user_id == body.user_id, Membership.org_id == c.org_id, Membership.is_active.is_(True))
+    ):
         raise NotFound("User is not a member of this organisation")
     m = c.db.scalar(select(ProjectMember).where(ProjectMember.project_id == p.id, ProjectMember.user_id == body.user_id))
     if m:
@@ -200,8 +201,14 @@ def update_gap(project_id: uuid.UUID, gap_id: uuid.UUID, body: GapIn, c: Ctx = D
 @router.get("/{project_id}/assessments", response_model=list[AssessmentOut])
 def list_assessments(project_id: uuid.UUID, c: Ctx = Depends(require("projects:read"))) -> list[Assessment]:
     p = svc.get_project(c, project_id)
-    return list(c.db.scalars(select(Assessment).where(Assessment.project_id == p.id).order_by(Assessment.version.desc())
-                             .execution_options(populate_existing=True)))
+    return list(
+        c.db.scalars(
+            select(Assessment)
+            .where(Assessment.project_id == p.id)
+            .order_by(Assessment.version.desc())
+            .execution_options(populate_existing=True)
+        )
+    )
 
 
 @router.post("/{project_id}/assessments", response_model=AssessmentOut, status_code=201)
@@ -217,13 +224,17 @@ def get_assessment(project_id: uuid.UUID, assessment_id: uuid.UUID, c: Ctx = Dep
     a = c.db.scalar(select(Assessment).where(Assessment.id == assessment_id, Assessment.project_id == p.id))
     if a is None:
         raise NotFound("Assessment not found")
-    return {**AssessmentOut.model_validate(a).model_dump(mode="json"), "snapshot": a.snapshot,
-            "integrity_verified": svc.verify_assessment(a)}
+    return {
+        **AssessmentOut.model_validate(a).model_dump(mode="json"),
+        "snapshot": a.snapshot,
+        "integrity_verified": svc.verify_assessment(a),
+    }
 
 
 @router.post("/{project_id}/assessments/{assessment_id}/status", response_model=AssessmentOut)
-def set_assessment_status(project_id: uuid.UUID, assessment_id: uuid.UUID, body: AssessmentStatusIn,
-                          c: Ctx = Depends(require("assessments:review"))) -> Assessment:
+def set_assessment_status(
+    project_id: uuid.UUID, assessment_id: uuid.UUID, body: AssessmentStatusIn, c: Ctx = Depends(require("assessments:review"))
+) -> Assessment:
     p = svc.get_project(c, project_id)
     a = c.db.scalar(select(Assessment).where(Assessment.id == assessment_id, Assessment.project_id == p.id))
     if a is None:

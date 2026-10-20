@@ -121,10 +121,17 @@ def create_document(
             raise ValidationFailed(f"PDF could not be opened: {exc}", code="corrupt_pdf") from exc
     db.add(doc)
     db.flush()
-    enqueue(db, PROCESS_JOB, {"document_id": str(doc.id)}, org_id=org_id, created_by=user_id,
-            dedupe_key=f"process:{doc.id}")
-    record(db, "document.uploaded", org_id=org_id, actor_id=user_id, entity_type="document", entity_id=doc.id,
-           detail={"sha256": digest, "filename": filename, "content_type": content_type}, request_id=request_id)
+    enqueue(db, PROCESS_JOB, {"document_id": str(doc.id)}, org_id=org_id, created_by=user_id, dedupe_key=f"process:{doc.id}")
+    record(
+        db,
+        "document.uploaded",
+        org_id=org_id,
+        actor_id=user_id,
+        entity_type="document",
+        entity_id=doc.id,
+        detail={"sha256": digest, "filename": filename, "content_type": content_type},
+        request_id=request_id,
+    )
     return doc, True
 
 
@@ -135,8 +142,14 @@ def request_processing(db: Session, doc: Document, user_id: uuid.UUID, *, force_
         raise Conflict("Document is quarantined after a failed malware scan and cannot be processed")
     doc.status = DocumentStatus.queued
     doc.processing_error = None
-    return enqueue(db, PROCESS_JOB, {"document_id": str(doc.id), "force_ocr": force_ocr},
-                   org_id=doc.org_id, created_by=user_id, dedupe_key=f"process:{doc.id}")
+    return enqueue(
+        db,
+        PROCESS_JOB,
+        {"document_id": str(doc.id), "force_ocr": force_ocr},
+        org_id=doc.org_id,
+        created_by=user_id,
+        dedupe_key=f"process:{doc.id}",
+    )
 
 
 def _chunks(text: str) -> list[tuple[int, int]]:
@@ -194,10 +207,17 @@ def process_document(job: JobContext) -> dict:
         total = doc.page_count or 1
         for pt in ex.extract(local, doc.content_type, force_ocr=force_ocr):
             page = DocumentPage(
-                org_id=doc.org_id, document_id=doc.id, page_number=pt.page_number, text=pt.text,
-                normalised_text=normalise(pt.text), extraction_method=ExtractionMethod(pt.method),
-                ocr_confidence=pt.ocr_confidence, detected_language=pt.language,
-                processing_version=version, is_current=False, char_count=len(pt.text),
+                org_id=doc.org_id,
+                document_id=doc.id,
+                page_number=pt.page_number,
+                text=pt.text,
+                normalised_text=normalise(pt.text),
+                extraction_method=ExtractionMethod(pt.method),
+                ocr_confidence=pt.ocr_confidence,
+                detected_language=pt.language,
+                processing_version=version,
+                is_current=False,
+                char_count=len(pt.text),
             )
             db.add(page)
             pages.append(page)
@@ -205,29 +225,57 @@ def process_document(job: JobContext) -> dict:
         db.flush()
 
         # Swap the current version atomically.
-        db.execute(update(DocumentPage).where(DocumentPage.document_id == doc.id, DocumentPage.processing_version != version)
-                   .values(is_current=False))
+        db.execute(
+            update(DocumentPage)
+            .where(DocumentPage.document_id == doc.id, DocumentPage.processing_version != version)
+            .values(is_current=False)
+        )
         for p in pages:
             p.is_current = True
 
         db.execute(delete(PageChunk).where(PageChunk.document_id == doc.id))
         for p in pages:
             for i, (s, e) in enumerate(_chunks(p.text)):
-                db.add(PageChunk(org_id=doc.org_id, page_id=p.id, document_id=doc.id, page_number=p.page_number,
-                                 chunk_index=i, text=p.text[s:e], char_start=s, char_end=e))
+                db.add(
+                    PageChunk(
+                        org_id=doc.org_id,
+                        page_id=p.id,
+                        document_id=doc.id,
+                        page_number=p.page_number,
+                        chunk_index=i,
+                        text=p.text[s:e],
+                        char_start=s,
+                        char_end=e,
+                    )
+                )
 
         # Unreviewed machine candidates from earlier runs are replaced; reviewed claims are preserved.
-        db.execute(delete(Claim).where(Claim.document_id == doc.id, Claim.extraction_method == ExtractionMethod.rule,
-                                       Claim.review_status == ReviewStatus.unreviewed))
+        db.execute(
+            delete(Claim).where(
+                Claim.document_id == doc.id,
+                Claim.extraction_method == ExtractionMethod.rule,
+                Claim.review_status == ReviewStatus.unreviewed,
+            )
+        )
         n_claims = 0
         for p in pages:
             for c in extract_candidates(p.text):
-                db.add(Claim(
-                    org_id=doc.org_id, document_id=doc.id, page_number=p.page_number, char_start=c.char_start,
-                    char_end=c.char_end, claim_type=ClaimType(c.claim_type), statement=c.statement,
-                    commodities=c.commodities, attributes=c.attributes, extraction_method=ExtractionMethod.rule,
-                    extractor_version=RULES_VERSION, confidence=c.confidence,
-                ))
+                db.add(
+                    Claim(
+                        org_id=doc.org_id,
+                        document_id=doc.id,
+                        page_number=p.page_number,
+                        char_start=c.char_start,
+                        char_end=c.char_end,
+                        claim_type=ClaimType(c.claim_type),
+                        statement=c.statement,
+                        commodities=c.commodities,
+                        attributes=c.attributes,
+                        extraction_method=ExtractionMethod.rule,
+                        extractor_version=RULES_VERSION,
+                        confidence=c.confidence,
+                    )
+                )
                 n_claims += 1
 
         langs = sorted({p.detected_language for p in pages if p.detected_language})
@@ -240,9 +288,13 @@ def process_document(job: JobContext) -> dict:
         doc.status = DocumentStatus.processed
         doc.processing_error = None
         summary = {
-            "pages": len(pages), "ocr_pages": len(ocr_pages), "empty_pages": empty_pages,
+            "pages": len(pages),
+            "ocr_pages": len(ocr_pages),
+            "empty_pages": empty_pages,
             "mean_ocr_confidence": round(sum(p.ocr_confidence or 0 for p in ocr_pages) / len(ocr_pages), 2) if ocr_pages else None,
-            "claim_candidates": n_claims, "processing_version": version, "malware_scan": scan,
+            "claim_candidates": n_claims,
+            "processing_version": version,
+            "malware_scan": scan,
         }
         doc.metadata_ = {**(doc.metadata_ or {}), "last_processing": summary}
         record(db, "document.processed", org_id=doc.org_id, actor_id=None, entity_type="document", entity_id=doc.id, detail=summary)

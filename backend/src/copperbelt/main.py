@@ -38,8 +38,7 @@ log = structlog.get_logger()
 def _error(status: int, code: str, message: str, request: Request, detail=None) -> JSONResponse:  # noqa: ANN001
     return JSONResponse(
         status_code=status,
-        content={"error": {"code": code, "message": message, "detail": detail,
-                           "request_id": getattr(request.state, "request_id", None)}},
+        content={"error": {"code": code, "message": message, "detail": detail, "request_id": getattr(request.state, "request_id", None)}},
     )
 
 
@@ -49,7 +48,7 @@ def create_app() -> FastAPI:
         title="Copperbelt Intelligence API",
         version=__version__,
         description="Evidence-traceable geological and mining project intelligence. "
-                    "All tenant endpoints require `Authorization: Bearer <token>` and `X-Org-Id`.",
+        "All tenant endpoints require `Authorization: Bearer <token>` and `X-Org-Id`.",
         openapi_url="/api/v1/openapi.json",
         docs_url="/api/docs",
         redoc_url=None,
@@ -83,11 +82,18 @@ def create_app() -> FastAPI:
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
-        response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'" if not request.url.path.startswith("/api/docs") else response.headers.get("Content-Security-Policy", "")
+        if not request.url.path.startswith("/api/docs"):  # Swagger UI needs its own scripts
+            response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
         if settings.environment in ("staging", "production"):
             response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
-        log.info("http.request", method=request.method, path=request.url.path, status=response.status_code,
-                 duration_ms=round(elapsed, 1), request_id=request.state.request_id)
+        log.info(
+            "http.request",
+            method=request.method,
+            path=request.url.path,
+            status=response.status_code,
+            duration_ms=round(elapsed, 1),
+            request_id=request.state.request_id,
+        )
         return response
 
     @app.exception_handler(AppError)
@@ -125,8 +131,13 @@ def create_app() -> FastAPI:
                 checks["database"] = {"ok": True, "migration": rev}
                 q = dict(s.execute(select(Job.status, func.count()).group_by(Job.status)).all())
                 dead = q.get(JobStatus.dead, 0)
-                checks["jobs"] = {"ok": True, "queued": q.get(JobStatus.queued, 0), "running": q.get(JobStatus.running, 0),
-                                  "failed_retrying": q.get(JobStatus.failed, 0), "dead": dead}
+                checks["jobs"] = {
+                    "ok": True,
+                    "queued": q.get(JobStatus.queued, 0),
+                    "running": q.get(JobStatus.running, 0),
+                    "failed_retrying": q.get(JobStatus.failed, 0),
+                    "dead": dead,
+                }
         except Exception as exc:  # noqa: BLE001
             ok = False
             checks["database"] = {"ok": False, "error": type(exc).__name__}

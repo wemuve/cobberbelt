@@ -95,8 +95,11 @@ def dossier(c, p: Project) -> dict[str, Any]:  # noqa: ANN001, C901
     linked_ids = set(db.scalars(select(ProjectFeature.feature_id).where(ProjectFeature.project_id == p.id)))
     in_aoi: dict[uuid.UUID, list[str]] = {}
     for a in aois:
-        for fid in db.scalars(select(GeoFeature.id).where(GeoFeature.org_id == c.org_id, GeoFeature.deleted_at.is_(None),
-                                                          func.ST_Intersects(GeoFeature.geom, a.geom))):
+        for fid in db.scalars(
+            select(GeoFeature.id).where(
+                GeoFeature.org_id == c.org_id, GeoFeature.deleted_at.is_(None), func.ST_Intersects(GeoFeature.geom, a.geom)
+            )
+        ):
             in_aoi.setdefault(fid, []).append(a.name)
     feature_ids = linked_ids | set(in_aoi)
     features = db.scalars(select(GeoFeature).where(GeoFeature.id.in_(feature_ids)).order_by(GeoFeature.name)).all() if feature_ids else []
@@ -112,28 +115,46 @@ def dossier(c, p: Project) -> dict[str, Any]:  # noqa: ANN001, C901
     claim_ids: set[uuid.UUID] = set()
     for fid, rel, cl in links:
         claim_ids.add(cl.id)
-        ev_by_feature.setdefault(fid, []).append({
-            "claim_id": str(cl.id), "relation": str(rel), "statement": cl.statement, "review_status": str(cl.review_status),
-            "evidence_basis": str(cl.evidence_basis), "document_id": str(cl.document_id) if cl.document_id else None,
-            "page_number": cl.page_number, "reported_date": cl.reported_date.isoformat() if cl.reported_date else None,
-        })
+        ev_by_feature.setdefault(fid, []).append(
+            {
+                "claim_id": str(cl.id),
+                "relation": str(rel),
+                "statement": cl.statement,
+                "review_status": str(cl.review_status),
+                "evidence_basis": str(cl.evidence_basis),
+                "document_id": str(cl.document_id) if cl.document_id else None,
+                "page_number": cl.page_number,
+                "reported_date": cl.reported_date.isoformat() if cl.reported_date else None,
+            }
+        )
 
-    docs = db.execute(select(Document.id, Document.title, Document.publication_year, Document.classification, Document.sha256)
-                      .join(ProjectDocument, ProjectDocument.document_id == Document.id)
-                      .where(ProjectDocument.project_id == p.id, visible_documents_clause(c))).all()
+    docs = db.execute(
+        select(Document.id, Document.title, Document.publication_year, Document.classification, Document.sha256)
+        .join(ProjectDocument, ProjectDocument.document_id == Document.id)
+        .where(ProjectDocument.project_id == p.id, visible_documents_clause(c))
+    ).all()
     risks = db.scalars(select(Risk).where(Risk.project_id == p.id).order_by(Risk.created_at)).all()
     gaps = db.scalars(select(EvidenceGap).where(EvidenceGap.project_id == p.id).order_by(EvidenceGap.created_at)).all()
 
     feature_rows = []
     for f in features:
         evs = ev_by_feature.get(f.id, [])
-        feature_rows.append({
-            "id": str(f.id), "name": f.name, "feature_type": f.feature_type, "commodities": f.commodities,
-            "geometry": to_geojson(f.geom), "location_precision": str(f.location_precision), "uncertainty_m": f.uncertainty_m,
-            "review_status": str(f.review_status), "in_areas": in_aoi.get(f.id, []), "explicitly_linked": f.id in linked_ids,
-            "evidence": evs,
-            "has_conflict": any(e["relation"] == "supports" for e in evs) and any(e["relation"] == "contradicts" for e in evs),
-        })
+        feature_rows.append(
+            {
+                "id": str(f.id),
+                "name": f.name,
+                "feature_type": f.feature_type,
+                "commodities": f.commodities,
+                "geometry": to_geojson(f.geom),
+                "location_precision": str(f.location_precision),
+                "uncertainty_m": f.uncertainty_m,
+                "review_status": str(f.review_status),
+                "in_areas": in_aoi.get(f.id, []),
+                "explicitly_linked": f.id in linked_ids,
+                "evidence": evs,
+                "has_conflict": any(e["relation"] == "supports" for e in evs) and any(e["relation"] == "contradicts" for e in evs),
+            }
+        )
 
     all_ev = [e for evs in ev_by_feature.values() for e in evs]
     quality = {
@@ -145,7 +166,9 @@ def dossier(c, p: Project) -> dict[str, Any]:  # noqa: ANN001, C901
         "evidence_accepted": sum(e["review_status"] == "accepted" for e in all_ev),
         "evidence_unreviewed": sum(e["review_status"] == "unreviewed" for e in all_ev),
         "evidence_historical_only": sum(e["evidence_basis"] == "historical_reported" for e in all_ev),
-        "evidence_independently_verified": sum(e["evidence_basis"] in ("independently_verified", "field_observation", "laboratory_result") for e in all_ev),
+        "evidence_independently_verified": sum(
+            e["evidence_basis"] in ("independently_verified", "field_observation", "laboratory_result") for e in all_ev
+        ),
     }
 
     # Automatic gap detection: facts about the dossier, never conclusions about the project.
@@ -164,19 +187,53 @@ def dossier(c, p: Project) -> dict[str, Any]:  # noqa: ANN001, C901
         auto_gaps.append(f"{quality['features_uncertainty_unknown']} feature(s) have unknown location uncertainty.")
 
     return {
-        "project": {"id": str(p.id), "name": p.name, "description": p.description, "country": p.country,
-                    "commodities": p.commodities, "stage": p.stage},
+        "project": {
+            "id": str(p.id),
+            "name": p.name,
+            "description": p.description,
+            "country": p.country,
+            "commodities": p.commodities,
+            "stage": p.stage,
+        },
         "areas_of_interest": [{"id": str(a.id), "name": a.name, "geometry": to_geojson(a.geom), "area_km2": a.area_km2} for a in aois],
         "features": feature_rows,
-        "documents": [{"id": str(d.id), "title": d.title, "publication_year": d.publication_year,
-                       "classification": str(d.classification), "sha256": d.sha256} for d in docs],
-        "risks": [{"id": str(r.id), "title": r.title, "category": r.category, "description": r.description,
-                   "severity": r.severity, "likelihood": r.likelihood, "score": r.severity * r.likelihood,
-                   "band": risk_band(r.severity * r.likelihood), "status": str(r.status),
-                   "claim_ids": [str(x) for x in r.claim_ids], "verification_action": r.verification_action,
-                   "due_date": r.due_date.isoformat() if r.due_date else None} for r in risks],
-        "evidence_gaps": [{"id": str(g.id), "topic": g.topic, "why_it_matters": g.why_it_matters,
-                           "verification_action": g.verification_action, "status": g.status} for g in gaps],
+        "documents": [
+            {
+                "id": str(d.id),
+                "title": d.title,
+                "publication_year": d.publication_year,
+                "classification": str(d.classification),
+                "sha256": d.sha256,
+            }
+            for d in docs
+        ],
+        "risks": [
+            {
+                "id": str(r.id),
+                "title": r.title,
+                "category": r.category,
+                "description": r.description,
+                "severity": r.severity,
+                "likelihood": r.likelihood,
+                "score": r.severity * r.likelihood,
+                "band": risk_band(r.severity * r.likelihood),
+                "status": str(r.status),
+                "claim_ids": [str(x) for x in r.claim_ids],
+                "verification_action": r.verification_action,
+                "due_date": r.due_date.isoformat() if r.due_date else None,
+            }
+            for r in risks
+        ],
+        "evidence_gaps": [
+            {
+                "id": str(g.id),
+                "topic": g.topic,
+                "why_it_matters": g.why_it_matters,
+                "verification_action": g.verification_action,
+                "status": g.status,
+            }
+            for g in gaps
+        ],
         "detected_gaps": auto_gaps,
         "evidence_quality": quality,
         "not_checked": [
@@ -204,9 +261,17 @@ def create_assessment(c, p: Project, title: str, reviewer_conclusion: str | None
         "disclaimer": DISCLAIMER,
         "dossier": dossier(c, p),
     }
-    a = Assessment(org_id=c.org_id, project_id=p.id, version=version, title=title, method_version=ASSESSMENT_METHOD_VERSION,
-                   reviewer_conclusion=reviewer_conclusion, snapshot=snapshot, content_sha256=_seal(snapshot),
-                   created_by=c.user.id)
+    a = Assessment(
+        org_id=c.org_id,
+        project_id=p.id,
+        version=version,
+        title=title,
+        method_version=ASSESSMENT_METHOD_VERSION,
+        reviewer_conclusion=reviewer_conclusion,
+        snapshot=snapshot,
+        content_sha256=_seal(snapshot),
+        created_by=c.user.id,
+    )
     c.db.add(a)
     c.db.flush()
     record_ctx(c, "assessment.created", "assessment", a.id, project_id=str(p.id), version=version, sha256=a.content_sha256)
@@ -232,8 +297,9 @@ def change_assessment_status(c, a: Assessment, status: str, conclusion: str | No
             a.reviewer_conclusion = conclusion
         if not (a.reviewer_conclusion and a.reviewer_conclusion.strip()):
             raise ValidationFailed("An approved assessment must record the reviewer's professional conclusion")
-        for prev in c.db.scalars(select(Assessment).where(Assessment.project_id == a.project_id,
-                                                          Assessment.status == AssessmentStatus.approved)):
+        for prev in c.db.scalars(
+            select(Assessment).where(Assessment.project_id == a.project_id, Assessment.status == AssessmentStatus.approved)
+        ):
             prev.status = AssessmentStatus.superseded
         a.status = AssessmentStatus.approved
         a.approved_by = c.user.id

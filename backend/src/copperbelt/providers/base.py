@@ -76,14 +76,14 @@ class Provider:
                 result = CheckResult("unreachable", f"{type(exc).__name__}: {exc}")
             result.latency_ms = int((time.monotonic() - t0) * 1000)
         with system_session() as s:
-            s.add(ProviderCheck(provider=self.info.id, status=result.status, detail=result.detail[:4000],
-                                latency_ms=result.latency_ms))
+            s.add(ProviderCheck(provider=self.info.id, status=result.status, detail=result.detail[:4000], latency_ms=result.latency_ms))
         return result
 
     def status(self) -> dict[str, Any]:
         with system_session() as s:
-            last = s.scalar(select(ProviderCheck).where(ProviderCheck.provider == self.info.id)
-                            .order_by(ProviderCheck.checked_at.desc()).limit(1))
+            last = s.scalar(
+                select(ProviderCheck).where(ProviderCheck.provider == self.info.id).order_by(ProviderCheck.checked_at.desc()).limit(1)
+            )
         if not self.configured():
             status = "unconfigured"
         elif last is None or last.status == "unconfigured":
@@ -91,16 +91,44 @@ class Provider:
         else:
             status = last.status
         return {
-            "id": self.info.id, "name": self.info.name, "purpose": self.info.purpose, "status": status,
-            "missing_configuration": self.missing_configuration(), "capabilities": self.info.capabilities,
-            "licence_notes": self.info.licence_notes, "docs_url": self.info.docs_url,
-            "last_check": {"status": last.status, "detail": last.detail, "latency_ms": last.latency_ms,
-                           "checked_at": last.checked_at.isoformat()} if last else None,
+            "id": self.info.id,
+            "name": self.info.name,
+            "purpose": self.info.purpose,
+            "status": status,
+            "missing_configuration": self.missing_configuration(),
+            "capabilities": self.info.capabilities,
+            "licence_notes": self.info.licence_notes,
+            "docs_url": self.info.docs_url,
+            "last_check": {
+                "status": last.status,
+                "detail": last.detail,
+                "latency_ms": last.latency_ms,
+                "checked_at": last.checked_at.isoformat(),
+            }
+            if last
+            else None,
         }
 
 
-def record_usage(provider: str, operation: str, units: float, unit_name: str, *, org_id=None,  # noqa: ANN001
-                 cost_usd: float | None = None, detail: dict | None = None) -> None:
+def record_usage(
+    provider: str,
+    operation: str,
+    units: float,
+    unit_name: str,
+    *,
+    org_id=None,  # noqa: ANN001
+    cost_usd: float | None = None,
+    detail: dict | None = None,
+) -> None:
     with system_session() as s:
-        s.add(ProviderUsage(org_id=org_id, provider=provider, operation=operation, units=units, unit_name=unit_name,
-                            estimated_cost_usd=cost_usd, detail=detail or {}))
+        s.add(
+            ProviderUsage(
+                org_id=org_id,
+                provider=provider,
+                operation=operation,
+                units=units,
+                unit_name=unit_name,
+                estimated_cost_usd=cost_usd,
+                detail=detail or {},
+            )
+        )

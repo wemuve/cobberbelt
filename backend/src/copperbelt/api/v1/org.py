@@ -20,8 +20,7 @@ router = APIRouter(tags=["organisation"])
 
 def _members(c: Ctx) -> list[MemberOut]:
     rows = c.db.execute(
-        select(Membership, User).join(User, User.id == Membership.user_id).where(Membership.org_id == c.org_id)
-        .order_by(User.full_name)
+        select(Membership, User).join(User, User.id == Membership.user_id).where(Membership.org_id == c.org_id).order_by(User.full_name)
     ).all()
     return [MemberOut(user_id=u.id, email=u.email, full_name=u.full_name, role=str(m.role), is_active=m.is_active) for m, u in rows]
 
@@ -83,8 +82,11 @@ def revoke_member(user_id: uuid.UUID, c: Ctx = Depends(require("members:manage")
         raise Conflict("You cannot revoke your own membership")
     m = _membership(c, user_id)
     if m.role == Role.owner:
-        owners = c.db.scalar(select(func.count()).select_from(Membership).where(
-            Membership.org_id == c.org_id, Membership.role == Role.owner, Membership.is_active.is_(True)))
+        owners = c.db.scalar(
+            select(func.count())
+            .select_from(Membership)
+            .where(Membership.org_id == c.org_id, Membership.role == Role.owner, Membership.is_active.is_(True))
+        )
         if owners <= 1:
             raise Conflict("Cannot remove the last owner")
     m.is_active = False
@@ -110,19 +112,27 @@ def audit_events(
     total = c.db.scalar(select(func.count()).select_from(q.subquery()))
     rows = c.db.scalars(q.order_by(AuditEvent.occurred_at.desc()).limit(limit).offset(offset)).all()
     return {
-        "total": total, "limit": limit, "offset": offset,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
         "items": [
-            {"id": str(e.id), "action": e.action, "actor_id": str(e.actor_id) if e.actor_id else None,
-             "entity_type": e.entity_type, "entity_id": e.entity_id, "detail": e.detail,
-             "request_id": e.request_id, "occurred_at": e.occurred_at.isoformat()}
+            {
+                "id": str(e.id),
+                "action": e.action,
+                "actor_id": str(e.actor_id) if e.actor_id else None,
+                "entity_type": e.entity_type,
+                "entity_id": e.entity_id,
+                "detail": e.detail,
+                "request_id": e.request_id,
+                "occurred_at": e.occurred_at.isoformat(),
+            }
             for e in rows
         ],
     }
 
 
 @router.get("/jobs", response_model=list[JobOut])
-def list_jobs(c: Ctx = Depends(require("documents:read")), status: str | None = None,
-              limit: int = Query(50, ge=1, le=200)) -> list[Job]:
+def list_jobs(c: Ctx = Depends(require("documents:read")), status: str | None = None, limit: int = Query(50, ge=1, le=200)) -> list[Job]:
     q = select(Job).where(Job.org_id == c.org_id)
     if status:
         q = q.where(Job.status == status)

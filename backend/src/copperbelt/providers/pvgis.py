@@ -58,8 +58,16 @@ class PVGISProvider(Provider):
         if not (-90 <= lat <= 90 and -180 <= lon <= 180):
             raise ValidationFailed("Latitude/longitude out of range")
 
-    def pv_estimate(self, lat: float, lon: float, peak_kw: float = 1.0, loss_pct: float = 14.0,
-                    angle: float | None = None, aspect: float = 0.0, org_id=None) -> dict[str, Any]:  # noqa: ANN001
+    def pv_estimate(
+        self,
+        lat: float,
+        lon: float,
+        peak_kw: float = 1.0,
+        loss_pct: float = 14.0,
+        angle: float | None = None,
+        aspect: float = 0.0,
+        org_id=None,
+    ) -> dict[str, Any]:  # noqa: ANN001
         self._validate_point(lat, lon)
         params: dict[str, Any] = {"lat": lat, "lon": lon, "peakpower": peak_kw, "loss": loss_pct, "aspect": aspect}
         if angle is None:

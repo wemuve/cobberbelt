@@ -91,7 +91,9 @@ class S3ObjectStore:
 
     def put_file(self, key: str, path: Path, content_type: str) -> None:
         self.client.upload_file(
-            str(path), self.bucket, _safe_key(key),
+            str(path),
+            self.bucket,
+            _safe_key(key),
             ExtraArgs={"ContentType": content_type, "ServerSideEncryption": "AES256"},
         )
 

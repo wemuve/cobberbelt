@@ -39,8 +39,7 @@ DECIMAL_PAIR = re.compile(
     r"(?<![\d.])(?P<lat>-?\d{1,2}\.\d{3,})\s*°?\s*(?P<lath>[NS])?\s*[,;/ ]\s*(?P<lon>-?\d{1,3}\.\d{3,})\s*°?\s*(?P<lonh>[EW])?(?![\d.])"
 )
 
-_HEM = {"n": 1, "nord": 1, "north": 1, "s": -1, "sud": -1, "south": -1, "e": 1, "est": 1, "east": 1,
-        "w": -1, "ouest": -1, "west": -1}
+_HEM = {"n": 1, "nord": 1, "north": 1, "s": -1, "sud": -1, "south": -1, "e": 1, "est": 1, "east": 1, "w": -1, "ouest": -1, "west": -1}
 _LAT_HEM = {"n", "s", "nord", "sud", "north", "south"}
 
 
@@ -81,8 +80,18 @@ def parse_coordinates(text: str) -> list[dict[str, Any]]:
             continue
         precision = "seconds" if m.group("asec") else "minutes" if m.group("amin") else "degrees"
         if abs(lat) <= 90 and abs(lon) <= 180:
-            out.append({"lat": round(lat, 6), "lon": round(lon, 6), "format": "dms", "stated_precision": precision,
-                        "verbatim": m.group(0), "start": m.start(), "end": m.end(), "datum": "unknown"})
+            out.append(
+                {
+                    "lat": round(lat, 6),
+                    "lon": round(lon, 6),
+                    "format": "dms",
+                    "stated_precision": precision,
+                    "verbatim": m.group(0),
+                    "start": m.start(),
+                    "end": m.end(),
+                    "datum": "unknown",
+                }
+            )
     for m in DECIMAL_PAIR.finditer(text):
         lat, lon = float(m.group("lat")), float(m.group("lon"))
         if m.group("lath") and m.group("lath").upper() == "S":
@@ -90,9 +99,18 @@ def parse_coordinates(text: str) -> list[dict[str, Any]]:
         if m.group("lonh") and m.group("lonh").upper() == "W":
             lon = -abs(lon)
         if abs(lat) <= 90 and abs(lon) <= 180 and (m.group("lath") or m.group("lonh") or lat < 0):
-            out.append({"lat": lat, "lon": lon, "format": "decimal", "verbatim": m.group(0),
-                        "stated_precision": f"{len(m.group('lat').split('.')[1])}dp",
-                        "start": m.start(), "end": m.end(), "datum": "unknown"})
+            out.append(
+                {
+                    "lat": lat,
+                    "lon": lon,
+                    "format": "decimal",
+                    "verbatim": m.group(0),
+                    "stated_precision": f"{len(m.group('lat').split('.')[1])}dp",
+                    "start": m.start(),
+                    "end": m.end(),
+                    "datum": "unknown",
+                }
+            )
     return out
 
 
@@ -121,8 +139,9 @@ def extract_candidates(text: str) -> list[Candidate]:
         stmt = text[s:e].strip()
         start = text.index(stmt, s) if stmt else c["start"]
         attrs = {k: c[k] for k in ("lat", "lon", "format", "stated_precision", "verbatim", "datum")}
-        cands.append(Candidate("coordinate", stmt or c["verbatim"], start, start + len(stmt or c["verbatim"]),
-                               CONF_COORDINATE, attributes=attrs))
+        cands.append(
+            Candidate("coordinate", stmt or c["verbatim"], start, start + len(stmt or c["verbatim"]), CONF_COORDINATE, attributes=attrs)
+        )
 
     for s, e in sentences(text):
         sent = text[s:e]

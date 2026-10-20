@@ -69,9 +69,7 @@ def ctx(
     lookup = new_session(system=True)
     try:
         membership = lookup.scalar(
-            select(Membership).where(
-                Membership.user_id == user.id, Membership.org_id == x_org_id, Membership.is_active.is_(True)
-            )
+            select(Membership).where(Membership.user_id == user.id, Membership.org_id == x_org_id, Membership.is_active.is_(True))
         )
         if membership is None or not membership.organisation.is_active:
             # Do not reveal whether the organisation exists.

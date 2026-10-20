@@ -114,23 +114,36 @@ def search(c, sq: SearchQuery) -> dict[str, Any]:  # noqa: ANN001, C901
         total_pages = db.scalar(select(func.count()).select_from(base.subquery())) or 0
         rows = db.execute(
             select(
-                DocumentPage.document_id, DocumentPage.page_number, DocumentPage.extraction_method,
-                DocumentPage.ocr_confidence, Document.title, Document.publication_year, Document.classification,
-                Source.name.label("source_name"), rank.label("rank"),
+                DocumentPage.document_id,
+                DocumentPage.page_number,
+                DocumentPage.extraction_method,
+                DocumentPage.ocr_confidence,
+                Document.title,
+                Document.publication_year,
+                Document.classification,
+                Source.name.label("source_name"),
+                rank.label("rank"),
                 func.ts_headline("simple", DocumentPage.text, query, SNIPPET_OPTS).label("snippet"),
             )
             .join(Document, Document.id == DocumentPage.document_id)
             .join(Source, Source.id == Document.source_id)
             .where(and_(*conds))
             .order_by(rank.desc(), DocumentPage.page_number)
-            .limit(sq.limit).offset(sq.offset)
+            .limit(sq.limit)
+            .offset(sq.offset)
         ).all()
         page_hits = [
             {
-                "document_id": str(r.document_id), "document_title": r.title, "page_number": r.page_number,
-                "snippet": r.snippet, "score": round(float(r.rank), 5), "publication_year": r.publication_year,
-                "source": r.source_name, "classification": str(r.classification),
-                "extraction_method": str(r.extraction_method), "ocr_confidence": r.ocr_confidence,
+                "document_id": str(r.document_id),
+                "document_title": r.title,
+                "page_number": r.page_number,
+                "snippet": r.snippet,
+                "score": round(float(r.rank), 5),
+                "publication_year": r.publication_year,
+                "source": r.source_name,
+                "classification": str(r.classification),
+                "extraction_method": str(r.extraction_method),
+                "ocr_confidence": r.ocr_confidence,
                 "evidence_url": f"/api/v1/documents/{r.document_id}/pages/{r.page_number}",
             }
             for r in rows
@@ -141,8 +154,13 @@ def search(c, sq: SearchQuery) -> dict[str, Any]:  # noqa: ANN001, C901
     score = literal(0.0, Float)
     if sq.q:
         sim = func.similarity(GeoFeature.name, sq.q)
-        fconds.append(or_(GeoFeature.name.op("%")(sq.q), GeoFeature.name.ilike(f"%{sq.q}%"),
-                          GeoFeature.commodities.overlap([canonical_commodity(t) or t.lower() for t in sq.q.split()])))
+        fconds.append(
+            or_(
+                GeoFeature.name.op("%")(sq.q),
+                GeoFeature.name.ilike(f"%{sq.q}%"),
+                GeoFeature.commodities.overlap([canonical_commodity(t) or t.lower() for t in sq.q.split()]),
+            )
+        )
         score = cast(sim, Float)
         modes.append("trigram_names")
     if commodities:
@@ -160,14 +178,25 @@ def search(c, sq: SearchQuery) -> dict[str, Any]:  # noqa: ANN001, C901
         ).all()
         feature_hits = [
             {
-                "id": str(f.id), "name": f.name, "feature_type": f.feature_type, "commodities": f.commodities,
-                "geometry": to_geojson(f.geom), "location_precision": str(f.location_precision),
-                "uncertainty_m": f.uncertainty_m, "review_status": str(f.review_status), "score": round(float(s or 0), 4),
+                "id": str(f.id),
+                "name": f.name,
+                "feature_type": f.feature_type,
+                "commodities": f.commodities,
+                "geometry": to_geojson(f.geom),
+                "location_precision": str(f.location_precision),
+                "uncertainty_m": f.uncertainty_m,
+                "review_status": str(f.review_status),
+                "score": round(float(s or 0), 4),
             }
             for f, s in frows
         ]
 
-    modes.append("semantic:unavailable(no embedding provider configured)")
+    from copperbelt.providers.registry import embeddings
+
+    if embeddings.configured():
+        modes.append("semantic:pending(embedding adapter not yet implemented)")
+    else:
+        modes.append("semantic:unavailable(no embedding provider configured)")
     return {
         "query": {"q": sq.q, "commodities": commodities, "expanded": _expanded_query_text(sq.q) if sq.q else None},
         "retrieval_modes": modes,

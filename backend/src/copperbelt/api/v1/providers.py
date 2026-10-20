@@ -63,7 +63,8 @@ def satellite_search(body: SatelliteSearchIn, c: Ctx = Depends(require("provider
     geom, _, warnings = to_storage_geometry(body.geometry.model_dump())
     from shapely.geometry import mapping
 
-    result = planet.search_scenes(mapping(geom), body.date_from, body.date_to, item_types=body.item_types,
-                                  max_cloud=body.max_cloud, limit=body.limit, org_id=c.org_id)
+    result = planet.search_scenes(
+        mapping(geom), body.date_from, body.date_to, item_types=body.item_types, max_cloud=body.max_cloud, limit=body.limit, org_id=c.org_id
+    )
     record_ctx(c, "satellite.search", "provider", "planet", count=result["count"])
     return {**result, "warnings": warnings}

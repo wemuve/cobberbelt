@@ -204,15 +204,11 @@ class DocumentPage(IdMixin, TenantMixin, Base):
         Index("ix_pages_tsv", "tsv", postgresql_using="gin"),
     )
 
-    document_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, index=True
-    )
+    document_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, index=True)
     page_number: Mapped[int] = mapped_column(Integer, nullable=False)  # 1-based, as printed by the viewer
     text: Mapped[str] = mapped_column(Text, default="", nullable=False)
     normalised_text: Mapped[str] = mapped_column(Text, default="", nullable=False)
-    extraction_method: Mapped[ExtractionMethod] = mapped_column(
-        Enum(ExtractionMethod, name="extraction_method"), nullable=False
-    )
+    extraction_method: Mapped[ExtractionMethod] = mapped_column(Enum(ExtractionMethod, name="extraction_method"), nullable=False)
     ocr_confidence: Mapped[float | None] = mapped_column(Float)  # 0-100 mean word confidence (Tesseract)
     detected_language: Mapped[str | None] = mapped_column(String(20))
     processing_version: Mapped[str] = mapped_column(String(40), nullable=False)
@@ -256,9 +252,7 @@ class Claim(IdMixin, TimestampMixin, TenantMixin, Base):
     __tablename__ = "claims"
     __table_args__ = (
         CheckConstraint("confidence IS NULL OR (confidence >= 0 AND confidence <= 1)", name="ck_claim_confidence"),
-        CheckConstraint(
-            "(document_id IS NULL) = (page_number IS NULL)", name="ck_claim_page_with_document"
-        ),
+        CheckConstraint("(document_id IS NULL) = (page_number IS NULL)", name="ck_claim_page_with_document"),
     )
 
     document_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("documents.id"), index=True)

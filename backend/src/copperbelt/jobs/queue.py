@@ -64,14 +64,14 @@ def enqueue(
         if existing:
             return existing
         # Free the key held by a finished job so the work can be requested again.
-        db.execute(
-            update(Job)
-            .where(Job.org_id == org_id, Job.dedupe_key == dedupe_key)
-            .values(dedupe_key=None)
-        )
+        db.execute(update(Job).where(Job.org_id == org_id, Job.dedupe_key == dedupe_key).values(dedupe_key=None))
     job = Job(
-        kind=kind, payload=payload, org_id=org_id, created_by=created_by,
-        dedupe_key=dedupe_key, max_attempts=max_attempts,
+        kind=kind,
+        payload=payload,
+        org_id=org_id,
+        created_by=created_by,
+        dedupe_key=dedupe_key,
+        max_attempts=max_attempts,
     )
     db.add(job)
     try:
@@ -101,9 +101,9 @@ class JobContext:
     def progress(self, fraction: float, message: str | None = None) -> None:
         with system_session() as s:
             s.execute(
-                update(Job).where(Job.id == self.job_id).values(
-                    progress=round(max(0.0, min(1.0, fraction)) * 100, 2), progress_message=message
-                )
+                update(Job)
+                .where(Job.id == self.job_id)
+                .values(progress=round(max(0.0, min(1.0, fraction)) * 100, 2), progress_message=message)
             )
 
 

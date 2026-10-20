@@ -37,7 +37,7 @@ def test_text_pdf_is_processed_with_page_level_evidence(owner):
     assert coord["attributes"]["datum"] == "unknown"
     assert coord["review_status"] == "unreviewed" and coord["extraction_method"] == "rule"
     page_text = p1["text"]
-    assert coord["statement"] == page_text[coord["char_start"]:coord["char_end"]]
+    assert coord["statement"] == page_text[coord["char_start"] : coord["char_end"]]
 
 
 def test_duplicate_upload_is_detected_by_checksum(owner):
@@ -104,8 +104,10 @@ def test_full_first_release_workflow(owner):
     assert any("datum unknown" in w.lower() for w in f["warnings"])
 
     # Preserve the conflicting later location rather than resolving it silently.
-    r = owner.post(f"/api/v1/geological-features/{f['id']}/evidence", json={"claim_id": c2["id"], "relation": "contradicts",
-                                                                           "note": "Later survey gives a position ~2 km away"})
+    r = owner.post(
+        f"/api/v1/geological-features/{f['id']}/evidence",
+        json={"claim_id": c2["id"], "relation": "contradicts", "note": "Later survey gives a position ~2 km away"},
+    )
     assert r.status_code == 201
     evidence = r.json()
     assert evidence["summary"]["has_conflict"] is True
@@ -119,21 +121,34 @@ def test_full_first_release_workflow(owner):
 
     # --- project workspace with AOI
     proj = owner.post("/api/v1/projects", json={"name": "Kambove screening", "country": "CD", "commodities": ["copper"]}).json()
-    aoi = owner.post("/api/v1/areas-of-interest", json={
-        "name": "Licence area (synthetic)", "project_id": proj["id"],
-        "geometry": {"type": "Polygon", "coordinates": [[[26.5, -10.9], [26.7, -10.9], [26.7, -10.7], [26.5, -10.7], [26.5, -10.9]]]},
-    })
+    aoi = owner.post(
+        "/api/v1/areas-of-interest",
+        json={
+            "name": "Licence area (synthetic)",
+            "project_id": proj["id"],
+            "geometry": {"type": "Polygon", "coordinates": [[[26.5, -10.9], [26.7, -10.9], [26.7, -10.7], [26.5, -10.7], [26.5, -10.9]]]},
+        },
+    )
     assert aoi.status_code == 201, aoi.text
     assert 400 < aoi.json()["area_km2"] < 500  # ~0.2° × 0.2° at 10.8°S
     owner.post(f"/api/v1/projects/{proj['id']}/documents", json={"ids": [doc_id]})
 
-    risk = owner.post(f"/api/v1/projects/{proj['id']}/risks", json={
-        "title": "Occurrence position uncertain", "category": "data_quality", "severity": 3, "likelihood": 4,
-        "claim_ids": [c1["id"], c2["id"]], "verification_action": "Field GPS check of the old workings",
-    })
+    risk = owner.post(
+        f"/api/v1/projects/{proj['id']}/risks",
+        json={
+            "title": "Occurrence position uncertain",
+            "category": "data_quality",
+            "severity": 3,
+            "likelihood": 4,
+            "claim_ids": [c1["id"], c2["id"]],
+            "verification_action": "Field GPS check of the old workings",
+        },
+    )
     assert risk.status_code == 201, risk.text
-    gap = owner.post(f"/api/v1/projects/{proj['id']}/gaps", json={
-        "topic": "Current licence status", "verification_action": "Request extract from the Cadastre Minier"})
+    gap = owner.post(
+        f"/api/v1/projects/{proj['id']}/gaps",
+        json={"topic": "Current licence status", "verification_action": "Request extract from the Cadastre Minier"},
+    )
     assert gap.status_code == 201
 
     dossier = owner.get(f"/api/v1/projects/{proj['id']}/dossier").json()
@@ -156,8 +171,9 @@ def test_full_first_release_workflow(owner):
     admin = add_member(owner, "admin")
     owner.post(f"/api/v1/projects/{proj['id']}/members", json={"user_id": admin.user_id, "role": "contributor"})
     assert admin.post(f"{base}/status", json={"status": "approved"}).status_code == 422  # conclusion required
-    ok = admin.post(f"{base}/status", json={"status": "approved",
-                                            "reviewer_conclusion": "Position must be field-verified before further work."})
+    ok = admin.post(
+        f"{base}/status", json={"status": "approved", "reviewer_conclusion": "Position must be field-verified before further work."}
+    )
     assert ok.status_code == 200 and ok.json()["status"] == "approved"
     got = owner.get(base).json()
     assert got["integrity_verified"] is True
@@ -165,5 +181,11 @@ def test_full_first_release_workflow(owner):
 
     # Audit trail recorded the chain.
     actions = {e["action"] for e in owner.get("/api/v1/audit-events", params={"limit": 200}).json()["items"]}
-    assert {"document.uploaded", "document.processed", "claim.reviewed", "feature.promoted_from_claim",
-            "assessment.created", "assessment.approved"} <= actions
+    assert {
+        "document.uploaded",
+        "document.processed",
+        "claim.reviewed",
+        "feature.promoted_from_claim",
+        "assessment.created",
+        "assessment.approved",
+    } <= actions

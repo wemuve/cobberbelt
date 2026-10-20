@@ -12,10 +12,22 @@ import unicodedata
 
 # canonical commodity -> terms (lower-case, accents stripped at match time)
 COMMODITY_TERMS: dict[str, list[str]] = {
-    "copper": ["copper", "cuivre", "cupriferous", "cuprifere", "chalcopyrite", "chalcocite", "bornite",
-               "malachite", "azurite", "chrysocolla", "cuprite", "covellite", "native copper"],
-    "cobalt": ["cobalt", "cobaltifere", "cobaltiferous", "heterogenite", "carrollite", "linnaeite",
-               "cobaltite", "asbolane"],
+    "copper": [
+        "copper",
+        "cuivre",
+        "cupriferous",
+        "cuprifere",
+        "chalcopyrite",
+        "chalcocite",
+        "bornite",
+        "malachite",
+        "azurite",
+        "chrysocolla",
+        "cuprite",
+        "covellite",
+        "native copper",
+    ],
+    "cobalt": ["cobalt", "cobaltifere", "cobaltiferous", "heterogenite", "carrollite", "linnaeite", "cobaltite", "asbolane"],
     "uranium": ["uranium", "uraninite", "pitchblende", "uranifere"],
     "zinc": ["zinc", "sphalerite", "blende", "willemite", "smithsonite"],
     "lead": ["lead", "plomb", "galena", "galene", "cerussite"],
@@ -33,10 +45,31 @@ COMMODITY_TERMS: dict[str, list[str]] = {
 
 # Lithostratigraphic names used in the Central African Copperbelt literature.
 FORMATION_TERMS = [
-    "katanga supergroup", "supergroupe du katanga", "roan group", "groupe de roan", "roan",
-    "mines subgroup", "sous-groupe des mines", "r.a.t.", "rat", "kundelungu", "nguba",
-    "lower roan", "upper roan", "ore shale", "lufilian arc", "arc lufilien", "basement complex",
-    "muva", "mwashia", "dipeta", "kamoya", "dolomitic shale", "s.d.b.", "r.s.f.", "d.strat",
+    "katanga supergroup",
+    "supergroupe du katanga",
+    "roan group",
+    "groupe de roan",
+    "roan",
+    "mines subgroup",
+    "sous-groupe des mines",
+    "r.a.t.",
+    "rat",
+    "kundelungu",
+    "nguba",
+    "lower roan",
+    "upper roan",
+    "ore shale",
+    "lufilian arc",
+    "arc lufilien",
+    "basement complex",
+    "muva",
+    "mwashia",
+    "dipeta",
+    "kamoya",
+    "dolomitic shale",
+    "s.d.b.",
+    "r.s.f.",
+    "d.strat",
 ]
 
 

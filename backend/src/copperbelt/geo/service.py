@@ -61,8 +61,8 @@ def to_storage_geometry(geojson: dict[str, Any], source_crs: str | int | None = 
     minx, miny, maxx, maxy = geom.bounds
     if not (-180 <= minx <= 180 and -180 <= maxx <= 180 and -90 <= miny <= 90 and -90 <= maxy <= 90):
         raise ValidationFailed(
-            "Coordinates fall outside longitude/latitude bounds. Check the axis order (GeoJSON is lon, lat) "
-            "and the source CRS.", code="coordinates_out_of_range",
+            "Coordinates fall outside longitude/latitude bounds. Check the axis order (GeoJSON is lon, lat) and the source CRS.",
+            code="coordinates_out_of_range",
         )
     fx0, fy0, fx1, fy1 = FOCUS_BBOX
     if maxx < fx0 or minx > fx1 or maxy < fy0 or miny > fy1:

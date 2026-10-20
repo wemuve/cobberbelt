@@ -24,9 +24,7 @@ def visible_documents_clause(c) -> ColumnElement[bool]:  # noqa: ANN001
         .where(ProjectDocument.document_id == Document.id, ProjectMember.user_id == c.user.id)
     )
     granted = exists(
-        select(DocumentAccessGrant.id).where(
-            DocumentAccessGrant.document_id == Document.id, DocumentAccessGrant.user_id == c.user.id
-        )
+        select(DocumentAccessGrant.id).where(DocumentAccessGrant.document_id == Document.id, DocumentAccessGrant.user_id == c.user.id)
     )
     return and_(
         base,

@@ -191,8 +191,9 @@ class ClaimIn(BaseModel):
     commodities: list[str] = []
     attributes: dict[str, Any] = {}
     reported_date: date | None = None
-    evidence_basis: Literal["historical_reported", "independently_verified", "field_observation",
-                            "laboratory_result", "remote_sensing", "unknown"] = "historical_reported"
+    evidence_basis: Literal[
+        "historical_reported", "independently_verified", "field_observation", "laboratory_result", "remote_sensing", "unknown"
+    ] = "historical_reported"
     confidence: float | None = Field(default=None, ge=0, le=1)
 
 
@@ -236,8 +237,18 @@ class GeometryIn(BaseModel):
 
 class FeatureIn(BaseModel):
     name: str = Field(min_length=1, max_length=300)
-    feature_type: Literal["mineral_occurrence", "prospect", "deposit", "borehole", "sample_site", "survey_location",
-                          "formation_outcrop", "geological_boundary", "mine_working", "other"]
+    feature_type: Literal[
+        "mineral_occurrence",
+        "prospect",
+        "deposit",
+        "borehole",
+        "sample_site",
+        "survey_location",
+        "formation_outcrop",
+        "geological_boundary",
+        "mine_working",
+        "other",
+    ]
     commodities: list[str] = []
     description: str | None = None
     geometry: GeometryIn | None = None
@@ -355,8 +366,9 @@ class LinkIdsIn(BaseModel):
 
 class RiskIn(BaseModel):
     title: str = Field(min_length=3, max_length=300)
-    category: Literal["geological", "title", "environmental", "social", "infrastructure", "financial",
-                      "data_quality", "regulatory", "other"]
+    category: Literal[
+        "geological", "title", "environmental", "social", "infrastructure", "financial", "data_quality", "regulatory", "other"
+    ]
     description: str | None = None
     severity: int = Field(ge=1, le=5)
     likelihood: int = Field(ge=1, le=5)

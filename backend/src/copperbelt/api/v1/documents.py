@@ -68,8 +68,7 @@ def update_source(source_id: uuid.UUID, body: SourceIn, c: Ctx = Depends(require
     before = {"access_status": str(src.access_status), "licence": src.licence}
     for k, v in body.model_dump().items():
         setattr(src, k, v)
-    record_ctx(c, "source.updated", "source", src.id, before=before,
-               after={"access_status": body.access_status, "licence": body.licence})
+    record_ctx(c, "source.updated", "source", src.id, before=before, after={"access_status": body.access_status, "licence": body.licence})
     return src
 
 
@@ -97,13 +96,22 @@ def upload_document(
     path = svc.spool_upload(file.file, get_settings().max_upload_bytes)
     try:
         doc, created = svc.create_document(
-            c.db, org_id=c.org_id, user_id=c.user.id, source_id=source_id, upload_path=path,
-            filename=clean_filename(file.filename), request_id=c.request_id,
+            c.db,
+            org_id=c.org_id,
+            user_id=c.user.id,
+            source_id=source_id,
+            upload_path=path,
+            filename=clean_filename(file.filename),
+            request_id=c.request_id,
             fields={
-                "title": title, "classification": cls, "publication_year": publication_year,
+                "title": title,
+                "classification": cls,
+                "publication_year": publication_year,
                 "authors": [a.strip() for a in (authors or "").split(";") if a.strip()],
-                "document_type": document_type, "source_reference": source_reference,
-                "language": language, "country": country.upper() if country else None,
+                "document_type": document_type,
+                "source_reference": source_reference,
+                "language": language,
+                "country": country.upper() if country else None,
             },
         )
     finally:
@@ -132,8 +140,12 @@ def list_documents(
         query = query.where(Document.title.ilike(f"%{q}%"))
     total = c.db.scalar(select(func.count()).select_from(query.subquery()))
     items = c.db.scalars(query.order_by(Document.created_at.desc()).limit(limit).offset(offset)).all()
-    return {"total": total, "limit": limit, "offset": offset,
-            "items": [DocumentOut.model_validate(d).model_dump(mode="json", by_alias=True) for d in items]}
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "items": [DocumentOut.model_validate(d).model_dump(mode="json", by_alias=True) for d in items],
+    }
 
 
 @router.get("/documents/{document_id}", response_model=DocumentOut)
@@ -166,12 +178,14 @@ def delete_document(document_id: uuid.UUID, c: Ctx = Depends(require("documents:
 @router.post("/documents/{document_id}/grants", status_code=204)
 def grant_access(document_id: uuid.UUID, user_id: uuid.UUID, c: Ctx = Depends(require("documents:grant"))) -> None:
     doc = get_visible_document(c, document_id)
-    member = c.db.scalar(select(Membership).where(Membership.user_id == user_id, Membership.org_id == c.org_id,
-                                                  Membership.is_active.is_(True)))
+    member = c.db.scalar(
+        select(Membership).where(Membership.user_id == user_id, Membership.org_id == c.org_id, Membership.is_active.is_(True))
+    )
     if member is None:
         raise NotFound("User is not a member of this organisation")
-    if not c.db.scalar(select(DocumentAccessGrant).where(DocumentAccessGrant.document_id == doc.id,
-                                                          DocumentAccessGrant.user_id == user_id)):
+    if not c.db.scalar(
+        select(DocumentAccessGrant).where(DocumentAccessGrant.document_id == doc.id, DocumentAccessGrant.user_id == user_id)
+    ):
         c.db.add(DocumentAccessGrant(org_id=c.org_id, document_id=doc.id, user_id=user_id, granted_by=c.user.id))
     record_ctx(c, "document.access_granted", "document", doc.id, user_id=str(user_id))
 
@@ -179,8 +193,9 @@ def grant_access(document_id: uuid.UUID, user_id: uuid.UUID, c: Ctx = Depends(re
 @router.delete("/documents/{document_id}/grants/{user_id}", status_code=204)
 def revoke_access(document_id: uuid.UUID, user_id: uuid.UUID, c: Ctx = Depends(require("documents:grant"))) -> None:
     doc = get_visible_document(c, document_id)
-    grant = c.db.scalar(select(DocumentAccessGrant).where(DocumentAccessGrant.document_id == doc.id,
-                                                           DocumentAccessGrant.user_id == user_id))
+    grant = c.db.scalar(
+        select(DocumentAccessGrant).where(DocumentAccessGrant.document_id == doc.id, DocumentAccessGrant.user_id == user_id)
+    )
     if grant:
         c.db.delete(grant)
     record_ctx(c, "document.access_revoked", "document", doc.id, user_id=str(user_id))
@@ -192,24 +207,36 @@ def download_original(document_id: uuid.UUID, c: Ctx = Depends(require("document
     record_ctx(c, "document.downloaded", "document", doc.id)
     stream = get_store().open(doc.storage_key)
     return StreamingResponse(
-        stream, media_type=doc.content_type,
-        headers={"Content-Disposition": f'attachment; filename="{doc.original_filename}"',
-                 "X-Content-SHA256": doc.sha256, "Cache-Control": "private, no-store"},
+        stream,
+        media_type=doc.content_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{doc.original_filename}"',
+            "X-Content-SHA256": doc.sha256,
+            "Cache-Control": "private, no-store",
+        },
     )
 
 
 @router.get("/documents/{document_id}/pages", response_model=list[PageSummary])
 def list_pages(document_id: uuid.UUID, c: Ctx = Depends(require("documents:read"))) -> list[DocumentPage]:
     doc = get_visible_document(c, document_id)
-    return list(c.db.scalars(select(DocumentPage).where(DocumentPage.document_id == doc.id, DocumentPage.is_current.is_(True))
-                             .order_by(DocumentPage.page_number)))
+    return list(
+        c.db.scalars(
+            select(DocumentPage)
+            .where(DocumentPage.document_id == doc.id, DocumentPage.is_current.is_(True))
+            .order_by(DocumentPage.page_number)
+        )
+    )
 
 
 @router.get("/documents/{document_id}/pages/{page_number}", response_model=PageOut)
 def get_page(document_id: uuid.UUID, page_number: int, c: Ctx = Depends(require("documents:read"))) -> DocumentPage:
     doc = get_visible_document(c, document_id)
-    page = c.db.scalar(select(DocumentPage).where(DocumentPage.document_id == doc.id, DocumentPage.page_number == page_number,
-                                                  DocumentPage.is_current.is_(True)))
+    page = c.db.scalar(
+        select(DocumentPage).where(
+            DocumentPage.document_id == doc.id, DocumentPage.page_number == page_number, DocumentPage.is_current.is_(True)
+        )
+    )
     if page is None:
         raise NotFound("Page not found or document not yet processed")
     return page
@@ -244,11 +271,15 @@ def process(document_id: uuid.UUID, body: ProcessIn | None = None, c: Ctx = Depe
 @router.get("/documents/{document_id}/status")
 def status(document_id: uuid.UUID, c: Ctx = Depends(require("documents:read"))) -> dict:
     doc = get_visible_document(c, document_id)
-    job = c.db.scalar(select(Job).where(Job.org_id == c.org_id, Job.payload["document_id"].astext == str(doc.id))
-                      .order_by(Job.created_at.desc()).limit(1))
+    job = c.db.scalar(
+        select(Job).where(Job.org_id == c.org_id, Job.payload["document_id"].astext == str(doc.id)).order_by(Job.created_at.desc()).limit(1)
+    )
     return {
-        "document_id": str(doc.id), "status": str(doc.status), "processing_error": doc.processing_error,
-        "malware_scan": doc.malware_scan, "processing_version": doc.processing_version,
+        "document_id": str(doc.id),
+        "status": str(doc.status),
+        "processing_error": doc.processing_error,
+        "malware_scan": doc.malware_scan,
+        "processing_version": doc.processing_version,
         "last_processing": (doc.metadata_ or {}).get("last_processing"),
         "job": JobOut.model_validate(job).model_dump(mode="json") if job else None,
         "retryable": doc.status in (DocumentStatus.failed,) or (job is not None and str(job.status) in ("dead", "failed")),
