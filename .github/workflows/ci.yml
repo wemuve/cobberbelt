@@ -50,7 +50,7 @@ jobs:
           CBI_DATABASE_OWNER_URL: postgresql+psycopg://copperbelt:devpassword@localhost:5432/copperbelt_test
         run: uv run alembic upgrade head && uv run alembic check
       - name: Tests
-        run: uv run pytest -o addopts="" -q -p no:warnings
+        run: uv run pytest -o addopts="" -q -p no:warnings --cov=copperbelt --cov-report=term-missing:skip-covered
       - name: Dependency vulnerability audit
         run: uv run pip-audit --skip-editable
       - name: OpenAPI spec is current
