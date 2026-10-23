@@ -59,5 +59,15 @@ ignore = ["S101", "B008", "S105", "S106", "S608", "UP042", "UP046"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+addopts = "-q --cov=copperbelt --cov-report=term-missing:skip-covered"
 markers = ["live: requires real external credentials (skipped by default)"]
+
+[tool.coverage.run]
+source = ["copperbelt"]
+branch = false
+
+[tool.coverage.report]
+# Current total is 88%. Raise this as coverage grows; never lower it to make CI pass.
+fail_under = 85
+show_missing = true
+skip_covered = true

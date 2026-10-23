@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-24.04
     services:
       postgres:
-        image: postgis/postgis:16-3.5
+        image: pgvector/pgvector:0.8.7-pg16-bookworm   # same base as deploy/db/Dockerfile
         env:
           POSTGRES_PASSWORD: postgres
         ports: ["5432:5432"]
@@ -26,14 +26,14 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v4
-      - name: System packages (Tesseract eng+fra, pgvector, psql)
+      - name: System packages (Tesseract eng+fra, psql)
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-fra postgresql-client fonts-dejavu-core
-      - name: Install pgvector into the service container
+      - name: Install PostGIS into the service container
         run: |
-          CID=$(docker ps -q --filter ancestor=postgis/postgis:16-3.5)
-          docker exec "$CID" bash -c "apt-get update && apt-get install -y postgresql-16-pgvector"
+          CID=$(docker ps -q --filter ancestor=pgvector/pgvector:0.8.7-pg16-bookworm)
+          docker exec "$CID" bash -c "apt-get update && apt-get install -y --no-install-recommends postgresql-16-postgis-3 postgresql-16-postgis-3-scripts"
       - name: Bootstrap roles and test database
         run: |
           psql -h localhost -U postgres -v owner_password=devpassword -v app_password=devpassword -f ../deploy/db/bootstrap.sql
@@ -42,6 +42,8 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.13"
+      - name: Lockfile matches pyproject.toml
+        run: uv lock --check
       - run: uv sync --frozen
       - name: Lint
         run: uv run ruff check src tests && uv run ruff format --check src tests
@@ -50,7 +52,7 @@ jobs:
           CBI_DATABASE_OWNER_URL: postgresql+psycopg://copperbelt:devpassword@localhost:5432/copperbelt_test
         run: uv run alembic upgrade head && uv run alembic check
       - name: Tests
-        run: uv run pytest -o addopts="" -q -p no:warnings
+        run: uv run pytest -o addopts="" -q -p no:warnings --cov=copperbelt --cov-report=term-missing:skip-covered
       - name: Dependency vulnerability audit
         run: uv run pip-audit --skip-editable
       - name: OpenAPI spec is current
@@ -73,6 +75,7 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      - run: npm test
       - run: npm run build
       - run: npm audit --audit-level=high --omit=dev
 
