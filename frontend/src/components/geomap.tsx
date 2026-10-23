@@ -1,6 +1,6 @@
 "use client";
 
-import maplibregl from "maplibre-gl";
+import * as maplibregl from "maplibre-gl";
 import { useEffect, useRef } from "react";
 import { bboxOf, circlePolygon } from "@/lib/geo";
 
@@ -39,6 +39,8 @@ export function GeoMap({ features, areas, selected, onSelect }: MapProps) {
   const map = useRef<maplibregl.Map | null>(null);
   const ready = useRef(false);
   const fitted = useRef(false);
+  /** Data that arrived before the style finished loading; applied once the layers exist. */
+  const pending = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (!el.current) return;
@@ -88,7 +90,8 @@ export function GeoMap({ features, areas, selected, onSelect }: MapProps) {
       m.on("mouseenter", "points", () => (m.getCanvas().style.cursor = "pointer"));
       m.on("mouseleave", "points", () => (m.getCanvas().style.cursor = ""));
       ready.current = true;
-      m.fire("cbi:data");
+      pending.current?.();
+      pending.current = null;
     });
     map.current = m;
     // The container is often sized after MapLibre measures it (dynamic import, grid layout): keep them in sync.
@@ -99,6 +102,7 @@ export function GeoMap({ features, areas, selected, onSelect }: MapProps) {
       m.remove();
       map.current = null;
       ready.current = false;
+      pending.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -120,7 +124,7 @@ export function GeoMap({ features, areas, selected, onSelect }: MapProps) {
       }
     };
     if (ready.current) apply();
-    else m.once("cbi:data", apply);
+    else pending.current = apply;
   }, [features, areas]);
 
   useEffect(() => {
