@@ -14,6 +14,7 @@ All notable changes to this project are recorded here. The format follows [Keep 
 - `.env.example` documents the variables used by the test harness, scripts, browser journey test and web build.
 
 ### Changed
+- Database image and CI service now build on `pgvector/pgvector:0.8.7-pg16-bookworm` plus PostGIS from apt. `postgis/postgis:16-3.5` is on Debian bullseye, which apt.postgresql.org no longer serves, so installing pgvector on it failed.
 - `maplibre-gl` 5.24 → 6.15 and `postcss` pinned to ≥ 8.5.31, clearing a critical and a high `npm audit` advisory that were failing CI.
 
 ## [0.1.0] - 2026-10-21
